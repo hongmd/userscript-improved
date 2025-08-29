@@ -24,19 +24,13 @@
 
   // ScriptCat & Browser Compatibility Detection
   const ENVIRONMENT = {
-    isScriptCat:
-      typeof GM_info !== "undefined" && GM_info.scriptHandler === "ScriptCat",
+    isScriptCat: GM_info?.scriptHandler === "ScriptCat",
     isFirefox: navigator.userAgent.toLowerCase().includes("firefox"),
-    isTampermonkey:
-      typeof GM_info !== "undefined" &&
-      GM_info.scriptHandler === "Tampermonkey",
-    isGreasemonkey:
-      typeof GM_info !== "undefined" &&
-      GM_info.scriptHandler === "Greasemonkey",
+    isTampermonkey: GM_info?.scriptHandler === "Tampermonkey",
+    isGreasemonkey: GM_info?.scriptHandler === "Greasemonkey",
 
     // Feature detection
-    hasStorage:
-      typeof GM_setValue !== "undefined" && typeof GM_getValue !== "undefined",
+    hasStorage: typeof GM_setValue !== "undefined" && typeof GM_getValue !== "undefined",
     hasMenuCommand: typeof GM_registerMenuCommand !== "undefined",
   };
 
@@ -158,7 +152,7 @@
       // Fallback to localStorage for ScriptCat compatibility
       try {
         const stored = localStorage.getItem(this._storagePrefix + storageKey);
-        return stored !== null ? JSON.parse(stored) : defaultValue;
+        return stored ? JSON.parse(stored) : defaultValue;
       } catch (e) {
         console.warn("[Storage] Both GM and localStorage failed:", e);
         return defaultValue;
@@ -196,11 +190,11 @@
 
     isExceptSite(url) {
       const exceptSites = this.get("EXCEPT_SITES")
-        .split(",")
-        .map((site) => site.trim().toLowerCase())
-        .filter((site) => site.length > 0);
+        ?.split(",")
+        ?.map((site) => site.trim().toLowerCase())
+        ?.filter((site) => site.length > 0) ?? [];
 
-      const currentDomain = Utils.getDomain(url).toLowerCase();
+      const currentDomain = Utils.getDomain(url)?.toLowerCase() ?? "";
 
       return exceptSites.some((site) => {
         // Remove protocol and www prefix for comparison
@@ -224,20 +218,15 @@
 
     createStyleElement() {
       // Remove existing style if present
-      const existing = document.getElementById(CONFIG.STYLE_ID);
-      if (existing) {
-        existing.remove();
-      }
+      document.getElementById(CONFIG.STYLE_ID)?.remove();
 
       this.styleElement = document.createElement("style");
       this.styleElement.id = CONFIG.STYLE_ID;
       this.styleElement.type = "text/css";
 
       // Try to append to head, fallback to document
-      const target = document.head || document.documentElement;
-      if (target) {
-        target.appendChild(this.styleElement);
-      }
+      const target = document.head ?? document.documentElement;
+      target?.appendChild(this.styleElement);
     },
 
     updateStyles() {
@@ -330,11 +319,7 @@
 
       // Add to page when DOM is ready
       const addMenu = () => {
-        if (document.body) {
-          document.body.appendChild(menuButton);
-        } else {
-          setTimeout(addMenu, 100);
-        }
+        document.body?.appendChild(menuButton) ?? setTimeout(addMenu, 100);
       };
       addMenu();
     },
@@ -391,7 +376,7 @@
 
       // Auto-hide after 5 seconds
       setTimeout(() => {
-        if (menu.parentNode) menu.remove();
+        menu.parentNode && menu.remove();
       }, 5000);
     },
 
@@ -415,13 +400,7 @@
 
     createColorPicker() {
       // Remove existing picker if present
-      const existingPicker = document.getElementById(
-        "visited-links-color-picker"
-      );
-      if (existingPicker) {
-        existingPicker.remove();
-        return;
-      }
+      document.getElementById("visited-links-color-picker")?.remove();
 
       const currentColor = ConfigManager.get("COLOR");
 
@@ -561,7 +540,7 @@
       picker.querySelector("#apply-color").onclick = () => {
         const selectedColor = picker
           .querySelector("#custom-color-text")
-          .value.trim();
+          ?.value?.trim();
         if (selectedColor && Utils.isValidColor(selectedColor)) {
           ConfigManager.set("COLOR", selectedColor);
           StyleManager.updateStyles();
@@ -661,9 +640,7 @@
       setTimeout(() => {
         notification.style.opacity = "0";
         setTimeout(() => {
-          if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
-          }
+          notification.parentNode?.removeChild(notification);
         }, 300);
       }, 3000);
     },
@@ -676,7 +653,7 @@
       );
 
       if (newExceptions !== null) {
-        const sanitizedExceptions = Utils.sanitizeInput(newExceptions.trim());
+        const sanitizedExceptions = Utils.sanitizeInput(newExceptions?.trim() ?? "");
         ConfigManager.set("EXCEPT_SITES", sanitizedExceptions);
         this.showNotification("Exception sites updated!", "success");
 
@@ -702,7 +679,7 @@
 
     checkAndApplyStyles() {
       const isEnabled = ConfigManager.get("ENABLED");
-      const currentUrl = document.documentURI || window.location.href;
+      const currentUrl = document.documentURI ?? window.location.href;
 
       if (isEnabled && !ConfigManager.isExceptSite(currentUrl)) {
         StyleManager.updateStyles();
