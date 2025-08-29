@@ -177,27 +177,242 @@
             
             if (newState) {
                 StyleManager.updateStyles();
-                alert('Visited Links Enhanced: Enabled');
+                this.showNotification('Visited Links Enhanced: Enabled', 'success');
             } else {
                 StyleManager.removeStyles();
-                alert('Visited Links Enhanced: Disabled');
+                this.showNotification('Visited Links Enhanced: Disabled', 'info');
             }
         },
 
         changeColor() {
-            const currentColor = ConfigManager.get('COLOR');
-            const newColor = prompt(`Enter a new color for visited links (current: ${currentColor}):\n\nYou can use:\n- Color names (red, blue, etc.)\n- Hex codes (#FF0000)\n- RGB values (rgb(255,0,0))`, currentColor);
-            
-            if (newColor && newColor.trim() !== '') {
-                const sanitizedColor = Utils.sanitizeInput(newColor.trim());
-                if (Utils.isValidColor(sanitizedColor)) {
-                    ConfigManager.set('COLOR', sanitizedColor);
-                    StyleManager.updateStyles();
-                    alert(`Color changed to: ${sanitizedColor}`);
-                } else {
-                    alert('Invalid color format. Please try again.');
-                }
+            this.createColorPicker();
+        },
+
+        createColorPicker() {
+            // Remove existing picker if present
+            const existingPicker = document.getElementById('visited-links-color-picker');
+            if (existingPicker) {
+                existingPicker.remove();
+                return;
             }
+
+            const currentColor = ConfigManager.get('COLOR');
+            
+            // Create overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'visited-links-color-picker';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-family: Arial, sans-serif;
+            `;
+
+            // Create picker dialog
+            const picker = document.createElement('div');
+            picker.style.cssText = `
+                background: white;
+                border-radius: 10px;
+                padding: 20px;
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+                max-width: 400px;
+                width: 90%;
+                max-height: 90vh;
+                overflow-y: auto;
+            `;
+
+            picker.innerHTML = `
+                <h3 style="margin: 0 0 15px 0; text-align: center; color: #333;">
+                    Choose Visited Link Color
+                </h3>
+                <p style="margin: 0 0 15px 0; color: #666; font-size: 14px; text-align: center;">
+                    Current color: <span style="color: ${currentColor}; font-weight: bold;">${currentColor}</span>
+                </p>
+                <div id="color-grid" style="
+                    display: grid;
+                    grid-template-columns: repeat(5, 1fr);
+                    gap: 8px;
+                    margin-bottom: 15px;
+                "></div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #333; font-weight: bold;">
+                        Custom Color:
+                    </label>
+                    <input type="color" id="custom-color" value="${this.colorToHex(currentColor)}" 
+                           style="width: 100%; height: 40px; border: none; border-radius: 5px; cursor: pointer;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #333; font-weight: bold;">
+                        Or enter color name/code:
+                    </label>
+                    <input type="text" id="custom-color-text" value="${currentColor}" 
+                           placeholder="e.g., red, #FF0000, rgb(255,0,0)"
+                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="apply-color" style="
+                        background: #4CAF50;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 14px;
+                    ">Apply</button>
+                    <button id="cancel-color" style="
+                        background: #f44336;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-size: 14px;
+                    ">Cancel</button>
+                </div>
+            `;
+
+            // Add color grid
+            const colorGrid = picker.querySelector('#color-grid');
+            COLOR_PALETTE.forEach(color => {
+                const colorButton = document.createElement('div');
+                colorButton.style.cssText = `
+                    width: 40px;
+                    height: 40px;
+                    background-color: ${color};
+                    border-radius: 5px;
+                    cursor: pointer;
+                    border: 2px solid ${color === currentColor ? '#333' : 'transparent'};
+                    transition: all 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    position: relative;
+                `;
+                
+                colorButton.title = color;
+                colorButton.onclick = () => {
+                    // Update all inputs
+                    picker.querySelector('#custom-color').value = color;
+                    picker.querySelector('#custom-color-text').value = color;
+                    
+                    // Update border selection
+                    colorGrid.querySelectorAll('div').forEach(btn => {
+                        btn.style.border = '2px solid transparent';
+                    });
+                    colorButton.style.border = '2px solid #333';
+                };
+
+                colorGrid.appendChild(colorButton);
+            });
+
+            // Event listeners
+            picker.querySelector('#custom-color').onchange = (e) => {
+                picker.querySelector('#custom-color-text').value = e.target.value;
+                this.updateColorSelection(colorGrid, e.target.value);
+            };
+
+            picker.querySelector('#custom-color-text').oninput = (e) => {
+                if (Utils.isValidColor(e.target.value)) {
+                    picker.querySelector('#custom-color').value = this.colorToHex(e.target.value);
+                    this.updateColorSelection(colorGrid, e.target.value);
+                }
+            };
+
+            picker.querySelector('#apply-color').onclick = () => {
+                const selectedColor = picker.querySelector('#custom-color-text').value.trim();
+                if (selectedColor && Utils.isValidColor(selectedColor)) {
+                    ConfigManager.set('COLOR', selectedColor);
+                    StyleManager.updateStyles();
+                    overlay.remove();
+                    this.showNotification(`Color changed to: ${selectedColor}`, 'success');
+                } else {
+                    this.showNotification('Invalid color format. Please try again.', 'error');
+                }
+            };
+
+            picker.querySelector('#cancel-color').onclick = () => {
+                overlay.remove();
+            };
+
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                }
+            };
+
+            overlay.appendChild(picker);
+            document.body.appendChild(overlay);
+        },
+
+        colorToHex(color) {
+            // Convert color to hex for color input
+            const div = document.createElement('div');
+            div.style.color = color;
+            document.body.appendChild(div);
+            const computedColor = getComputedStyle(div).color;
+            document.body.removeChild(div);
+            
+            const rgb = computedColor.match(/\d+/g);
+            if (rgb && rgb.length >= 3) {
+                return '#' + rgb.slice(0, 3).map(x => {
+                    const hex = parseInt(x).toString(16);
+                    return hex.length === 1 ? '0' + hex : hex;
+                }).join('');
+            }
+            return '#FF6B6B'; // fallback
+        },
+
+        updateColorSelection(colorGrid, selectedColor) {
+            colorGrid.querySelectorAll('div').forEach(btn => {
+                btn.style.border = '2px solid transparent';
+                if (btn.title === selectedColor) {
+                    btn.style.border = '2px solid #333';
+                }
+            });
+        },
+
+        showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 5px;
+                color: white;
+                font-family: Arial, sans-serif;
+                font-size: 14px;
+                z-index: 1000000;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            `;
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Fade in
+            setTimeout(() => {
+                notification.style.opacity = '1';
+            }, 10);
+            
+            // Auto remove
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
         },
 
         manageExceptions() {
@@ -210,7 +425,7 @@
             if (newExceptions !== null) {
                 const sanitizedExceptions = Utils.sanitizeInput(newExceptions.trim());
                 ConfigManager.set('EXCEPT_SITES', sanitizedExceptions);
-                alert('Exception sites updated!');
+                this.showNotification('Exception sites updated!', 'success');
                 
                 // Reapply styles based on new exceptions
                 App.checkAndApplyStyles();
@@ -306,3 +521,7 @@
 // 8. Better domain matching for exceptions
 // 9. Improved CSS with transitions
 // 10. Modular, maintainable code structure
+// 11. Visual color picker with preset colors
+// 12. Custom color input (hex, rgb, color names)
+// 13. Non-intrusive notification system
+// 14. Interactive UI with live preview
