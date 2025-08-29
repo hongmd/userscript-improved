@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Page Load Speed Monitor
 // @namespace    com.userscript.page-load-speed
-// @description  Ultra-lightweight page load speed monitor with dark transparent UI and auto-hide - minimal CPU/RAM impact
-// @version      1.5.0
+// @description  Ultra-lightweight page load speed monitor with dark transparent UI, auto-hide, and performance metrics info - minimal CPU/RAM impact
+// @version      1.6.0
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -66,7 +66,7 @@
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.1);
         cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
         user-select: none;
         opacity: 0.9;
       }
@@ -91,6 +91,16 @@
       #close-btn:hover {
         opacity: 1;
         color: #ff6b6b;
+      }
+      #info-btn {
+        float: right;
+        margin-left: 8px;
+        cursor: pointer;
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+      }
+      #info-btn:hover {
+        opacity: 1 !important;
       }
       #details {
         display: none;
@@ -117,6 +127,15 @@
       .metric-label {
         opacity: 0.8;
       }
+      #info-panel {
+        display: none;
+        margin-top: 12px;
+        padding: 8px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 6px;
+        font-size: 10px;
+        line-height: 1.4;
+      }
     `;
     
     const style = document.createElement('style');
@@ -136,23 +155,35 @@
     box.innerHTML = `
       <div id="main">⚡ Measuring...</div>
       <span id="close-btn" title="Close">×</span>
+      <span id="info-btn" title="Show metrics info" style="float: right; margin-left: 8px; cursor: pointer; opacity: 0.7;">ℹ️</span>
       <div style="font-size: 10px; opacity: 0.6; margin-top: 4px;">Auto-hide in 10s</div>
       <div id="details">
         <div class="metric">
-          <span class="metric-label">DOM Content Loaded:</span>
+          <span class="metric-label" title="Time until DOM is fully loaded and parsed">DOM Content Loaded:</span>
           <span id="dcl-time">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label">First Paint:</span>
+          <span class="metric-label" title="Time of first pixel painted on screen">First Paint:</span>
           <span id="fp-time">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label">First Contentful Paint:</span>
+          <span class="metric-label" title="Time when first content (text/image) becomes visible">First Contentful Paint:</span>
           <span id="fcp-time">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label">Largest Contentful Paint:</span>
+          <span class="metric-label" title="Time when largest content element becomes visible">Largest Contentful Paint:</span>
           <span id="lcp-time">-</span>
+        </div>
+      </div>
+      <div id="info-panel" style="display: none; margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 6px; font-size: 10px; line-height: 1.4;">
+        <div style="font-weight: bold; margin-bottom: 6px;">📊 Performance Metrics:</div>
+        <div>• <b>Total Load Time:</b> Complete page load duration</div>
+        <div>• <b>DOM Content Loaded:</b> HTML parsed, DOM ready</div>
+        <div>• <b>First Paint:</b> First visual change on screen</div>
+        <div>• <b>First Contentful Paint:</b> First meaningful content visible</div>
+        <div>• <b>Largest Contentful Paint:</b> Largest element visible (Core Web Vital)</div>
+        <div style="margin-top: 6px; font-size: 9px; opacity: 0.7;">
+          🟢 Good: Fast loading | 🟡 Medium: Acceptable | 🔴 Poor: Needs improvement
         </div>
       </div>
     `;
@@ -165,14 +196,37 @@
       box.remove();
     });
     
+    // Nút info để hiển thị thông tin metrics
+    box.querySelector('#info-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetAutoHide();
+      
+      const infoPanel = document.getElementById('info-panel');
+      const details = document.getElementById('details');
+      
+      if (infoPanel.style.display === 'none' || infoPanel.style.display === '') {
+        infoPanel.style.display = 'block';
+        details.classList.add('show');
+        box.classList.add('expanded');
+      } else {
+        infoPanel.style.display = 'none';
+      }
+    });
+    
     // Mở rộng/Thu gọn khi click
     let isExpanded = false;
-    box.addEventListener('click', () => {
+    box.addEventListener('click', (e) => {
+      // Bỏ qua nếu click vào nút close hoặc info
+      if (e.target.id === 'close-btn' || e.target.id === 'info-btn') return;
+      
       resetAutoHide(); // Reset timer khi click
       
       const details = document.getElementById('details');
+      const infoPanel = document.getElementById('info-panel');
+      
       if (isExpanded) {
         details.classList.remove('show');
+        infoPanel.style.display = 'none';
         box.classList.remove('expanded');
       } else {
         details.classList.add('show');
@@ -181,11 +235,38 @@
       isExpanded = !isExpanded;
     });
     
+    // Hiện thông tin metrics khi click nút info
+    box.querySelector('#info-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const infoPanel = document.getElementById('info-panel');
+      const isVisible = infoPanel.style.display === 'block';
+      
+      // Ẩn hiện thông tin
+      infoPanel.style.display = isVisible ? 'none' : 'block';
+      
+      // Tạm dừng tự động ẩn
+      if (isVisible) {
+        clearTimeout(autoHideTimer);
+        infoPanel.style.opacity = '0.9';
+      } else {
+        // Đặt lại timer tự động ẩn
+        resetAutoHide();
+      }
+    });
+    
     // Reset timer khi hover
     box.addEventListener('mouseenter', resetAutoHide);
     
     document.body.appendChild(box);
     isUICreated = true;
+    
+    // Hiệu ứng fade-in
+    box.style.opacity = '0';
+    box.style.transform = 'translateY(-10px)';
+    setTimeout(() => {
+      box.style.opacity = '0.9';
+      box.style.transform = 'translateY(0)';
+    }, 100);
     
     // Bắt đầu tự động tắt
     startAutoHide();
@@ -364,7 +445,9 @@
         // Tự động xóa sau 2 giây nữa
         setTimeout(() => {
           if (box && box.parentNode) {
-            box.remove();
+            box.style.opacity = '0';
+            box.style.transform = 'translateY(-10px) scale(0.9)';
+            setTimeout(() => box.remove(), 300);
           }
         }, 2000);
       }
