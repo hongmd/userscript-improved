@@ -2,11 +2,12 @@
 // @name        Visited Links Enhanced
 // @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.2.3
+// @version     0.2.4
 // @include     http*
 // @include     https*
 // @match       http://*/*
 // @match       https://*/*
+// @noframes
 // @icon        https://cdn.jsdelivr.net/gh/hongmd/cdn-web@main/logo.svg
 // @run-at      document-start
 // @grant       GM_setValue
@@ -227,10 +228,16 @@
       // Try to append to head, fallback to document
       const target = document.head ?? document.documentElement;
       target?.appendChild(this.styleElement);
+
+      // Return the created element for callers that expect a value
+      return this.styleElement;
     },
 
     updateStyles() {
-      this.styleElement ||= this.createStyleElement();
+      // Ensure style element exists and is attached
+      if (!this.styleElement || !document.contains(this.styleElement)) {
+        this.createStyleElement();
+      }
 
       const color = ConfigManager.get("COLOR");
       if (Utils.isValidColor(color)) {
@@ -264,6 +271,10 @@
             "🚫 Manage Exception Sites",
             this.manageExceptions.bind(this)
           );
+          GM_registerMenuCommand(
+            "🔄 Reset Settings",
+            this.resetSettings.bind(this)
+          );
 
           console.log("[ScriptCat] Menu commands registered successfully");
         } catch (e) {
@@ -296,7 +307,7 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        z-index: 999_998;
+        z-index: 999998;
         font-size: 18px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         transition: all 0.3s ease;
@@ -304,13 +315,13 @@
       `;
 
       menuButton.onmouseenter = () => {
-        menuButton.style.opacity ||= "1";
-        menuButton.style.transform ||= "scale(1.1)";
+        menuButton.style.opacity = "1";
+        menuButton.style.transform = "scale(1.1)";
       };
 
       menuButton.onmouseleave = () => {
-        menuButton.style.opacity ||= "0.8";
-        menuButton.style.transform ||= "scale(1)";
+        menuButton.style.opacity = "0.8";
+        menuButton.style.transform = "scale(1)";
       };
 
       menuButton.onclick = () => this.showFloatingMenu();
@@ -343,7 +354,7 @@
         background: white;
         border-radius: 8px;
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        z-index: 999_999;
+        z-index: 999999;
         overflow: hidden;
         min-width: 200px;
       `;
@@ -364,8 +375,8 @@
           transition: background 0.2s ease;
         `;
 
-        button.onmouseenter = () => (button.style.background ||= "#f5f5f5");
-        button.onmouseleave = () => (button.style.background ||= "white");
+        button.onmouseenter = () => (button.style.background = "#f5f5f5");
+        button.onmouseleave = () => (button.style.background = "white");
         button.onclick = () => {
           item.action();
           menu.remove();
@@ -416,7 +427,7 @@
                 width: 100%;
                 height: 100%;
                 background: rgba(0, 0, 0, 0.5);
-                z-index: 999_999;
+                z-index: 999999;
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -672,6 +683,14 @@
         // Reapply styles based on new exceptions
         App.checkAndApplyStyles();
       }
+    },
+
+    resetSettings() {
+      ConfigManager.set("COLOR", CONFIG.DEFAULTS.COLOR);
+      ConfigManager.set("EXCEPT_SITES", CONFIG.DEFAULTS.EXCEPT_SITES);
+      ConfigManager.set("ENABLED", CONFIG.DEFAULTS.ENABLED);
+      StyleManager.updateStyles();
+      this.showNotification("Settings reset to defaults", "success");
     },
   };
 
