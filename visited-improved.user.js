@@ -2,7 +2,7 @@
 // @name        Visited Links Enhanced
 // @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.2.1
+// @version     0.2.2
 // @include     http*
 // @include     https*
 // @match       http://*/*
@@ -624,6 +624,11 @@
                 z-index: 1_000_000;
                 opacity: 0;
                 transition: opacity 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 20px;
+                line-height: 1.4;
                 background: ${
                   type === "success"
                     ? "#4CAF50"
