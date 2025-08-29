@@ -2,7 +2,7 @@
 // @name         Page Load Speed Monitor
 // @namespace    com.userscript.page-load-speed
 // @description  Ultra-lightweight page load speed monitor with minimal UI - maximum performance, zero animations
-// @version      1.7.0
+// @version      1.8.0
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -19,12 +19,12 @@
 (function() {
   'use strict';
   
-  // ===== THỜI GIAN BẮT ĐẦU =====
+  // ===== START TIME =====
   const START_TIME = performance.now();
   let lcpTime = 0;
   let isUICreated = false;
   
-  // ===== THEO DÕI LCP =====
+  // ===== LCP TRACKING =====
   try {
     if (window.PerformanceObserver) {
       const lcpObserver = new PerformanceObserver((entryList) => {
@@ -41,7 +41,7 @@
     // LCP not supported
   }
   
-  // ===== TẠO CSS =====
+  // ===== CREATE CSS =====
   function injectStyles() {
     if (!document.head) {
       setTimeout(injectStyles, 10);
@@ -120,7 +120,7 @@
     document.head.appendChild(style);
   }
   
-  // ===== TẠO UI =====
+  // ===== CREATE UI =====
   function createUI() {
     if (isUICreated || !document.body) {
       if (!document.body) setTimeout(createUI, 10);
@@ -132,7 +132,7 @@
     box.innerHTML = `
       <div id="main">⚡ Measuring...</div>
       <span id="close-btn" title="Close">×</span>
-      <span id="info-btn" title="Show metrics info" style="float: right; margin-left: 8px; cursor: pointer; opacity: 0.7;">ℹ️</span>
+      <span id="info-btn" title="Show metrics info">ℹ️</span>
       <div style="font-size: 10px; opacity: 0.6; margin-top: 4px;">Auto-hide in 10s</div>
       <div id="details">
         <div class="metric">
@@ -165,7 +165,7 @@
       </div>
     `;
     
-    // Đóng UI khi click nút đóng
+    // Close UI when close button clicked
     box.querySelector('#close-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       clearTimeout(autoHideTimer);
@@ -173,30 +173,32 @@
       box.remove();
     });
     
-    // Nút info để hiển thị thông tin metrics
-    box.querySelector('#info-btn').addEventListener('click', (e) => {
+    // Info button to show metrics info
+    const infoBtn = box.querySelector('#info-btn');
+    infoBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       resetAutoHide();
       
       const infoPanel = document.getElementById('info-panel');
       const details = document.getElementById('details');
+      const isVisible = infoPanel.style.display === 'block';
       
-      if (infoPanel.style.display === 'none' || infoPanel.style.display === '') {
-        infoPanel.style.display = 'block';
+      // Toggle info display
+      infoPanel.style.display = isVisible ? 'none' : 'block';
+      
+      if (!isVisible) {
         details.classList.add('show');
         box.classList.add('expanded');
-      } else {
-        infoPanel.style.display = 'none';
       }
     });
     
-    // Mở rộng/Thu gọn khi click
+    // Expand/collapse on click
     let isExpanded = false;
     box.addEventListener('click', (e) => {
-      // Bỏ qua nếu click vào nút close hoặc info
+      // Skip if clicking close or info button
       if (e.target.id === 'close-btn' || e.target.id === 'info-btn') return;
       
-      resetAutoHide(); // Reset timer khi click
+      resetAutoHide(); // Reset timer on click
       
       const details = document.getElementById('details');
       const infoPanel = document.getElementById('info-panel');
@@ -212,57 +214,38 @@
       isExpanded = !isExpanded;
     });
     
-    // Hiện thông tin metrics khi click nút info
-    box.querySelector('#info-btn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const infoPanel = document.getElementById('info-panel');
-      const isVisible = infoPanel.style.display === 'block';
-      
-      // Ẩn hiện thông tin
-      infoPanel.style.display = isVisible ? 'none' : 'block';
-      
-      // Tạm dừng tự động ẩn
-      if (isVisible) {
-        clearTimeout(autoHideTimer);
-        infoPanel.style.opacity = '0.9';
-      } else {
-        // Đặt lại timer tự động ẩn
-        resetAutoHide();
-      }
-    });
-    
-    // Reset timer khi hover
+    // Reset timer on hover
     box.addEventListener('mouseenter', resetAutoHide);
     
     document.body.appendChild(box);
     isUICreated = true;
     
-    // Bắt đầu tự động tắt
+    // Start auto-hide
     startAutoHide();
     
-    // Cập nhật ngay sau khi tạo UI
+    // Update immediately after UI creation
     updateDisplay();
   }
   
-  // ===== CẬP NHẬT HIỂN THỊ =====
+  // ===== UPDATE DISPLAY =====
   function updateDisplay() {
     if (!isUICreated) return;
     
     const mainEl = document.getElementById('main');
     if (!mainEl) return;
     
-    // Lấy thời gian
+    // Get timing data
     const timings = getPageTimings();
     const totalTime = timings.loadTime;
     
-    // Cập nhật hiển thị chính
+    // Update main display
     if (totalTime > 0) {
       let speedClass = getSpeedClass(totalTime, 1000, 3000);
       mainEl.innerHTML = `⚡ ${totalTime}ms`;
       mainEl.className = speedClass;
     }
     
-    // Cập nhật chi tiết
+    // Update details
     updateMetric('dcl-time', timings.dcl, 800, 2000);
     updateMetric('fp-time', timings.fp, 1000, 2500);
     updateMetric('fcp-time', timings.fcp, 1800, 3000);
@@ -286,7 +269,7 @@
     }
   }
   
-  // ===== LẤY SỐ LIỆU HIỆU SUẤT =====
+  // ===== GET PERFORMANCE DATA =====
   function getPageTimings() {
     const result = {
       loadTime: 0,
@@ -295,7 +278,7 @@
       fcp: 0
     };
     
-    // Thử lấy từ Navigation API mới
+    // Try Navigation API Level 2
     try {
       const navEntry = performance.getEntriesByType('navigation')[0];
       if (navEntry) {
@@ -303,17 +286,17 @@
         result.dcl = Math.round(navEntry.domContentLoadedEventEnd);
       }
     } catch (e) {
-      // Không hỗ trợ Navigation API mới
+      // Navigation API Level 2 not supported
     }
     
-    // Thử lấy từ timing API cũ
+    // Fallback to Level 1 timing API
     if (!result.loadTime && performance.timing) {
       const t = performance.timing;
       result.loadTime = Math.round(t.loadEventEnd - t.navigationStart);
       result.dcl = Math.round(t.domContentLoadedEventEnd - t.navigationStart);
     }
     
-    // Thử lấy paint metrics
+    // Get paint metrics
     try {
       const paintEntries = performance.getEntriesByType('paint');
       for (const entry of paintEntries) {
@@ -325,10 +308,10 @@
         }
       }
     } catch (e) {
-      // Không hỗ trợ Paint Timing API
+      // Paint Timing API not supported
     }
     
-    // Dự phòng nếu không có timing APIs
+    // Fallback if no timing APIs available
     if (!result.loadTime) {
       result.loadTime = Math.round(performance.now() - START_TIME);
       result.dcl = Math.round(result.loadTime * 0.8);
@@ -337,28 +320,25 @@
     return result;
   }
   
-  // ===== KHỞI TẠO =====
+  // ===== INIT =====
   injectStyles();
   
-  // Tạo UI khi DOM sẵn sàng
+  // Create UI when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', createUI);
   } else {
     createUI();
   }
   
-  // Cập nhật số liệu khi trang tải xong
+  // Update metrics when page loads
   window.addEventListener('load', () => {
-    // Cập nhật ngay khi load
-    setTimeout(updateDisplay, 0);
-    
-    // Cập nhật lại sau một lúc để có metrics chính xác hơn
-    setTimeout(updateDisplay, 200);
-    setTimeout(updateDisplay, 1000);
-    setTimeout(updateDisplay, 2000);
+    // Update immediately and after delays for accuracy
+    updateDisplay();
+    setTimeout(updateDisplay, 500);
+    setTimeout(updateDisplay, 1500);
   });
   
-  // Menu báo cáo hiệu suất
+  // Performance report menu
   if (typeof GM_registerMenuCommand !== 'undefined') {
     GM_registerMenuCommand('📊 Performance Report', () => {
       const timings = getPageTimings();
@@ -376,16 +356,15 @@
     });
   }
   
-  // ===== TỰ ĐỘNG TẮT =====
+  // ===== AUTO HIDE =====
   let autoHideTimer;
   let countdownInterval;
-  let countdownElement;
   
   function startAutoHide() {
     let countdown = 10;
     
-    // Cập nhật countdown display
-    countdownElement = document.querySelector('#speed-box div[style*="font-size: 10px"]');
+    // Update countdown display
+    const countdownElement = document.querySelector('#speed-box div[style*="font-size: 10px"]');
     if (countdownElement) {
       countdownElement.textContent = `Auto-hide in ${countdown}s`;
     }
@@ -401,14 +380,14 @@
       }
     }, 1000);
     
-    // Tự động ẩn sau 10 giây
+    // Auto-hide after 10 seconds
     autoHideTimer = setTimeout(() => {
       const box = document.getElementById('speed-box');
       if (box) {
         clearInterval(countdownInterval);
         box.remove();
       }
-    }, 10000); // 10 giây
+    }, 10000); // 10 seconds
   }
   
   function resetAutoHide() {
