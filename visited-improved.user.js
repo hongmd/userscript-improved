@@ -124,7 +124,7 @@
 
     // Sanitize input
     sanitizeInput(input) {
-      return input.replace(/[<>'"]/g, "");
+      return input.replaceAll(/[<>'"]/g, "");
     },
   };
 
@@ -242,9 +242,8 @@
     },
 
     removeStyles() {
-      if (this.styleElement) {
-        this.styleElement.textContent = "";
-      }
+      this.styleElement &&= null;
+      this.styleElement?.textContent &&= "";
     },
   };
 
