@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist flat UI userscript for visited links customization
-// @version      0.5.2
+// @version      0.5.3
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -81,6 +81,7 @@
     { color: "#fca5a5", name: "Pastel Red" },
     { color: "#86efac", name: "Pastel Green" },
     { color: "#fed7aa", name: "Pastel Orange" },
+    { color: "#f97316", name: "Vibrant Orange" },
     { color: "#c4b5fd", name: "Pastel Purple" },
     { color: "#f9a8d4", name: "Pastel Pink" },
     { color: "#7dd3fc", name: "Pastel Sky Blue" },
@@ -89,6 +90,17 @@
     { color: "#fb7185", name: "Pastel Rose" },
     { color: "#a78bfa", name: "Pastel Violet" },
     { color: "#34d399", name: "Pastel Emerald" },
+    // Highlight colors for better link visibility
+    { color: "#dc2626", name: "Bold Red" },
+    { color: "#2563eb", name: "Bold Blue" },
+    { color: "#059669", name: "Bold Green" },
+    { color: "#7c3aed", name: "Bold Purple" },
+    { color: "#db2777", name: "Bold Pink" },
+    { color: "#ea580c", name: "Bold Orange" },
+    { color: "#0891b2", name: "Bold Cyan" },
+    { color: "#65a30d", name: "Bold Lime" },
+    { color: "#ca8a04", name: "Bold Yellow" },
+    { color: "#be123c", name: "Bold Rose" },
   ]);
 
   //// Utility Functions - ES2023 Enhanced
