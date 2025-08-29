@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Minimalist UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist userscript with dark/light mode for visited links customization
-// @version      0.4.1
+// @version      0.4.2
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -323,7 +323,14 @@
   //// Menu System with ScriptCat Compatibility
   const MenuManager = {
     init() {
-      // Try to register menu commands (ScriptCat/Tampermonkey support)
+      console.log("[Visited Links Enhanced] Initializing menu system...");
+      
+      // Always create floating menu for better compatibility
+      setTimeout(() => {
+        this.createFloatingMenu();
+      }, 200);
+      
+      // Try to register menu commands (ScriptCat/Tampermonkey support) as backup
       if (ENVIRONMENT.hasMenuCommand) {
         try {
           GM_registerMenuCommand(
@@ -346,18 +353,17 @@
           console.log("[ScriptCat] Menu commands registered successfully");
         } catch (e) {
           console.warn("[ScriptCat] Menu registration failed:", e);
-          this.createFloatingMenu();
         }
       } else {
-        console.log(
-          "[ScriptCat] GM_registerMenuCommand not available, creating floating menu"
-        );
-        this.createFloatingMenu();
+        console.log("[ScriptCat] GM_registerMenuCommand not available");
       }
     },
 
     // Fallback floating menu for when GM_registerMenuCommand is not available - ES2023 Enhanced
     createFloatingMenu() {
+      // Remove existing menu first
+      document.getElementById("visited-links-menu-button")?.remove();
+      
       // Create minimalist floating menu button
       const currentTheme = Utils.getCurrentTheme();
       const theme = CONFIG.THEMES[currentTheme];
@@ -404,15 +410,22 @@
 
       menuButton.addEventListener("click", () => this.showMinimalistMenu());
 
-      // Add to page when DOM is ready
-      const addMenu = () => {
-        if (document.body) {
-          document.body.appendChild(menuButton);
-        } else {
-          queueMicrotask(() => setTimeout(addMenu, 100));
-        }
-      };
-      addMenu();
+      // Add to page immediately if body exists, otherwise wait
+      if (document.body) {
+        document.body.appendChild(menuButton);
+        console.log("[Visited Links Enhanced] Floating menu button created");
+      } else {
+        // Wait for body to be available
+        const addMenu = () => {
+          if (document.body) {
+            document.body.appendChild(menuButton);
+            console.log("[Visited Links Enhanced] Floating menu button created (delayed)");
+          } else {
+            setTimeout(addMenu, 100);
+          }
+        };
+        addMenu();
+      }
     },
 
     showMinimalistMenu() {
@@ -927,15 +940,23 @@
   //// Main Application
   const App = {
     init() {
+      console.log("[Visited Links Enhanced] Initializing app...");
+      
       // Initialize components
       StyleManager.init();
-      MenuManager.init();
+      
+      // Wait a bit for DOM to be fully ready before creating menu
+      setTimeout(() => {
+        MenuManager.init();
+      }, 100);
 
       // Apply styles if enabled and not on exception site
       this.checkAndApplyStyles();
 
       // Handle dynamic content changes
       this.observeChanges();
+      
+      console.log("[Visited Links Enhanced] App initialization complete");
     },
 
     checkAndApplyStyles() {
@@ -977,15 +998,18 @@
     // Wait for DOM to be available
     if (document.documentElement) {
       App.init();
+      console.log("[Visited Links Enhanced] Script initialized successfully");
     } else {
       // Fallback for very early execution
-      setTimeout(initialize, 10);
+      setTimeout(initialize, 50);
     }
   }
 
-  // Start the script
+  // Start the script with multiple initialization methods
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initialize);
+    // Backup initialization
+    setTimeout(initialize, 1000);
   } else {
     initialize();
   }
