@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Minimalist UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist userscript with dark/light mode for visited links customization
-// @version      0.4.0
+// @version      0.4.1
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -76,7 +76,7 @@
       UI_COMPACT: true,
     }),
     STYLE_ID: "visited-lite-enhanced-style",
-    CSS_TEMPLATE: "a:visited, a:visited * { color: %COLOR% !important; transition: color 0.15s ease; }",
+    CSS_TEMPLATE: "a:visited, a:visited * { color: %COLOR% !important; }",
     
     // Theme configurations
     THEMES: Object.freeze({
@@ -390,26 +390,16 @@
         zIndex: "999998",
         color: theme.text,
         boxShadow: theme.shadow,
-        transition: "all 0.2s ease",
         opacity: "0.9",
-        backdropFilter: "blur(10px)",
       });
 
-      // Hover effects
+      // Simple hover effects
       menuButton.addEventListener("mouseenter", () => {
-        Object.assign(menuButton.style, {
-          opacity: "1",
-          transform: "scale(1.05)",
-          boxShadow: `0 4px 12px ${theme.accent}20`,
-        });
+        menuButton.style.opacity = "1";
       });
 
       menuButton.addEventListener("mouseleave", () => {
-        Object.assign(menuButton.style, {
-          opacity: "0.9",
-          transform: "scale(1)",
-          boxShadow: theme.shadow,
-        });
+        menuButton.style.opacity = "0.9";
       });
 
       menuButton.addEventListener("click", () => this.showMinimalistMenu());
@@ -445,11 +435,10 @@
         background: theme.bg,
         border: `1px solid ${theme.border}`,
         borderRadius: isCompact ? "8px" : "12px",
-        boxShadow: `0 8px 32px ${theme.text}10, ${theme.shadow}`,
+        boxShadow: theme.shadow,
         zIndex: "999999",
         overflow: "hidden",
         minWidth: isCompact ? "160px" : "200px",
-        backdropFilter: "blur(20px)",
         fontFamily: "system-ui, -apple-system, sans-serif",
         fontSize: isCompact ? "13px" : "14px",
       });
@@ -494,18 +483,15 @@
           cursor: "pointer",
           color: theme.text,
           borderBottom: `1px solid ${theme.border}`,
-          transition: "all 0.15s ease",
           fontSize: "inherit",
         });
 
         button.addEventListener("mouseenter", () => {
           button.style.background = theme.bgSecondary;
-          button.style.color = theme.accent;
         });
         
         button.addEventListener("mouseleave", () => {
           button.style.background = "transparent";
-          button.style.color = theme.text;
         });
         
         button.addEventListener("click", () => {
@@ -592,7 +578,6 @@
         width: "100%",
         height: "100%",
         background: `${theme.text}40`,
-        backdropFilter: "blur(8px)",
         zIndex: "999999",
         display: "flex",
         justifyContent: "center",
@@ -608,7 +593,7 @@
         border: `1px solid ${theme.border}`,
         borderRadius: isCompact ? "12px" : "16px",
         padding: isCompact ? "20px" : "24px",
-        boxShadow: `0 20px 60px ${theme.text}20, ${theme.shadow}`,
+        boxShadow: theme.shadow,
         maxWidth: isCompact ? "320px" : "380px",
         width: "90%",
         maxHeight: "90vh",
@@ -661,7 +646,6 @@
                    color: ${theme.text};
                    font-size: inherit;
                    box-sizing: border-box;
-                   transition: border-color 0.15s ease;
                  ">
         </div>
         
@@ -676,7 +660,6 @@
             cursor: pointer; 
             font-size: inherit;
             font-weight: 500;
-            transition: all 0.15s ease;
           ">Apply</button>
           <button id="cancel-color" style="
             background: ${theme.bgSecondary}; 
@@ -686,7 +669,6 @@
             border-radius: ${isCompact ? '6px' : '8px'}; 
             cursor: pointer; 
             font-size: inherit;
-            transition: all 0.15s ease;
           ">Cancel</button>
         </div>
       `;
@@ -704,21 +686,18 @@
           borderRadius: isCompact ? "4px" : "6px",
           cursor: "pointer",
           border: `2px solid ${color === currentColor ? theme.accent : 'transparent'}`,
-          transition: "all 0.15s ease",
           position: "relative",
         });
 
         colorButton.title = color;
         colorButton.addEventListener("mouseenter", () => {
           if (color !== currentColor) {
-            colorButton.style.transform = "scale(1.1)";
-            colorButton.style.boxShadow = `0 2px 8px ${color}40`;
+            colorButton.style.opacity = "0.8";
           }
         });
         
         colorButton.addEventListener("mouseleave", () => {
-          colorButton.style.transform = "scale(1)";
-          colorButton.style.boxShadow = "none";
+          colorButton.style.opacity = "1";
         });
         
         colorButton.addEventListener("click", () => {
@@ -756,26 +735,22 @@
       // Focus styling
       picker.querySelector("#custom-color-text")?.addEventListener("focus", (e) => {
         e.target.style.borderColor = theme.accent;
-        e.target.style.boxShadow = `0 0 0 3px ${theme.accent}20`;
       });
 
       picker.querySelector("#custom-color-text")?.addEventListener("blur", (e) => {
         e.target.style.borderColor = theme.border;
-        e.target.style.boxShadow = "none";
       });
 
-      // Button hover effects
+      // Simple button hover effects
       const applyBtn = picker.querySelector("#apply-color");
       const cancelBtn = picker.querySelector("#cancel-color");
 
       applyBtn?.addEventListener("mouseenter", () => {
-        applyBtn.style.transform = "translateY(-1px)";
-        applyBtn.style.boxShadow = `0 4px 12px ${theme.accent}40`;
+        applyBtn.style.opacity = "0.9";
       });
 
       applyBtn?.addEventListener("mouseleave", () => {
-        applyBtn.style.transform = "translateY(0)";
-        applyBtn.style.boxShadow = "none";
+        applyBtn.style.opacity = "1";
       });
 
       cancelBtn?.addEventListener("mouseenter", () => {
@@ -840,12 +815,11 @@
     },
 
     updateColorSelection(colorGrid, selectedColor, theme) {
-      // Update color selection with minimalist styling
+      // Update color selection with simple styling
       for (const btn of colorGrid.querySelectorAll("div")) {
         btn.style.border = "2px solid transparent";
         if (btn.title === selectedColor) {
           btn.style.border = `2px solid ${theme.accent}`;
-          btn.style.boxShadow = `0 0 0 3px ${theme.accent}20`;
         }
       }
     },
@@ -882,8 +856,6 @@
         font-weight: 500 !important;
         z-index: 2147483647 !important;
         opacity: 0 !important;
-        transform: translateY(-10px) !important;
-        transition: all 0.2s ease !important;
         display: flex !important;
         align-items: center !important;
         gap: ${isCompact ? '6px' : '8px'} !important;
@@ -891,7 +863,6 @@
         line-height: 1.3 !important;
         pointer-events: none !important;
         box-shadow: ${theme.shadow} !important;
-        backdrop-filter: blur(10px) !important;
         border-left: 3px solid ${colors[type]} !important;
       `;
 
@@ -911,16 +882,14 @@
 
       document.body.appendChild(notification);
 
-      // Show notification with smooth animation
+      // Show notification with simple fade-in
       requestAnimationFrame(() => {
         notification.style.setProperty("opacity", "1", "important");
-        notification.style.setProperty("transform", "translateY(0)", "important");
       });
 
       // Auto remove notification
       setTimeout(() => {
         notification.style.setProperty("opacity", "0", "important");
-        notification.style.setProperty("transform", "translateY(-10px)", "important");
         setTimeout(() => notification.remove(), 200);
       }, 3000);
     },
