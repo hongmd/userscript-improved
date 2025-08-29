@@ -2,7 +2,7 @@
 // @name        Visited Links Enhanced
 // @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.0.2
+// @version     0.1.1
 // @include     http*
 // @include     https*
 // @match       http://*/*
