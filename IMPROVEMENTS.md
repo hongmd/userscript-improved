@@ -1,33 +1,33 @@
-# Visited Links UserScript - Phân Tích và Cải Thiện
+# Visited Links UserScript - Analysis and Improvements
 
-## Phân tích script gốc
+## Original Script Analysis
 
-Script gốc (`Visited-hong.user.js`) có những vấn đề sau:
+The original script (`Visited-hong.user.js`) has the following issues:
 
-### 🔴 Vấn đề chính:
-1. **Cú pháp cũ**: Sử dụng `var` thay vì `const/let`, không có strict mode
-2. **Không có lưu trữ cấu hình**: Người dùng phải sửa code để thay đổi màu sắc
-3. **Xử lý lỗi kém**: Không có try-catch blocks
-4. **Hiệu suất**: Không tối ưu cho các trang web động (SPA)
-5. **Bảo mật**: Không validate input
-6. **Khả năng mở rộng**: Code khó maintain và mở rộng
+### 🔴 Major Issues:
+1. **Outdated syntax**: Uses `var` instead of `const/let`, no strict mode
+2. **No configuration storage**: Users must edit code to change colors
+3. **Poor error handling**: No try-catch blocks
+4. **Performance**: Not optimized for dynamic websites (SPA)
+5. **Security**: No input validation
+6. **Maintainability**: Code is hard to maintain and extend
 
-### 🟡 Vấn đề nhỏ:
-- Biến toàn cục có thể gây xung đột
-- Không hỗ trợ dark mode
-- Danh sách màu sắc cứng không thể thay đổi
-- Không có giao diện người dùng
+### 🟡 Minor Issues:
+- Global variables may cause conflicts
+- No dark mode support
+- Hard-coded color list cannot be changed
+- No user interface
 
-## Cải thiện trong phiên bản mới
+## Improvements in the New Version
 
-### ✅ Cải thiện lớn:
+### ✅ Major Improvements:
 
-#### 1. **Cấu trúc code hiện đại**
+#### 1. **Modern Code Structure**
 ```javascript
-// Cũ
+// Old
 var p_color_visited = "LightCoral";
 
-// Mới  
+// New  
 const CONFIG = {
     DEFAULTS: {
         COLOR: 'LightCoral'
@@ -35,24 +35,24 @@ const CONFIG = {
 };
 ```
 
-#### 2. **Lưu trữ cấu hình bền vững**
+#### 2. **Persistent Configuration Storage**
 ```javascript
-// Sử dụng GM_setValue/GM_getValue để lưu cài đặt
+// Using GM_setValue/GM_getValue to save settings
 const ConfigManager = {
     get(key) { return GM_getValue(CONFIG.STORAGE_KEYS[key], CONFIG.DEFAULTS[key]); },
     set(key, value) { GM_setValue(CONFIG.STORAGE_KEYS[key], value); }
 };
 ```
 
-#### 3. **Menu người dùng thân thiện**
-- Toggle on/off script
-- Thay đổi màu sắc qua giao diện
-- Quản lý sites ngoại lệ
-- Không cần sửa code
+#### 3. **User-Friendly Menu**
+- Toggle script on/off
+- Change colors through interface
+- Manage exception sites
+- No need to edit code
 
-#### 4. **Xử lý lỗi tốt hơn**
+#### 4. **Better Error Handling**
 ```javascript
-// Validate màu sắc
+// Color validation
 isValidColor(color) {
     const s = new Option().style;
     s.color = color;
@@ -60,17 +60,17 @@ isValidColor(color) {
 }
 ```
 
-#### 5. **Tối ưu hiệu suất**
+#### 5. **Performance Optimization**
 ```javascript
-// Debounce cho DOM changes
+// Debounce for DOM changes
 const debouncedUpdate = Utils.debounce(() => {
     this.checkAndApplyStyles();
 }, 100);
 ```
 
-#### 6. **Hỗ trợ SPA/Dynamic content**
+#### 6. **SPA/Dynamic Content Support**
 ```javascript
-// Observer cho thay đổi DOM
+// Observer for DOM changes
 const observer = new MutationObserver(debouncedUpdate);
 observer.observe(document.documentElement, {
     childList: true,
@@ -78,42 +78,42 @@ observer.observe(document.documentElement, {
 });
 ```
 
-### ✅ Tính năng mới:
+### ✅ New Features:
 
-1. **Transition CSS mượt mà**: `transition: color 0.2s ease`
-2. **Palette màu hiện đại**: Hex codes thay vì tên màu cũ
-3. **Domain matching thông minh**: Xử lý www, protocol tốt hơn
-4. **Modular design**: Dễ maintain và mở rộng
-5. **Debug interface**: Export objects để debug
-6. **Better sanitization**: Bảo mật input tốt hơn
+1. **Smooth CSS Transitions**: `transition: color 0.2s ease`
+2. **Modern Color Palette**: Hex codes instead of old color names
+3. **Smart Domain Matching**: Better handling of www, protocols
+4. **Modular Design**: Easy to maintain and extend
+5. **Debug Interface**: Export objects for debugging
+6. **Better Sanitization**: Improved input security
 
-## So sánh chức năng
+## Feature Comparison
 
-| Tính năng | Script gốc | Script cải thiện |
-|-----------|------------|------------------|
-| Thay đổi màu | ❌ Phải sửa code | ✅ Menu GUI |
-| Lưu cài đặt | ❌ Không | ✅ Persistent storage |
-| Toggle on/off | ❌ Không | ✅ Menu command |
-| Exception sites | ❌ Phải sửa code | ✅ GUI management |
-| Error handling | ❌ Cơ bản | ✅ Comprehensive |
-| Performance | ❌ Cơ bản | ✅ Optimized |
-| SPA support | ❌ Không | ✅ Full support |
+| Feature | Original Script | Improved Script |
+|---------|----------------|-----------------|
+| Color change | ❌ Must edit code | ✅ GUI menu |
+| Save settings | ❌ None | ✅ Persistent storage |
+| Toggle on/off | ❌ None | ✅ Menu command |
+| Exception sites | ❌ Must edit code | ✅ GUI management |
+| Error handling | ❌ Basic | ✅ Comprehensive |
+| Performance | ❌ Basic | ✅ Optimized |
+| SPA support | ❌ None | ✅ Full support |
 | Modern syntax | ❌ ES5 | ✅ ES6+ |
 
-## Hướng dẫn sử dụng script mới
+## Usage Guide for New Script
 
-1. **Cài đặt**: Copy script mới vào Tampermonkey/Greasemonkey
-2. **Cấu hình**: 
-   - Vào menu Tampermonkey → script → "Toggle Visited Links"
-   - "Change Color" để đổi màu
-   - "Manage Exception Sites" để quản lý sites ngoại lệ
-3. **Sử dụng**: Script tự động hoạt động, không cần can thiệp
+1. **Installation**: Copy the new script to Tampermonkey/Greasemonkey
+2. **Configuration**: 
+   - Go to Tampermonkey menu → script → "Toggle Visited Links"
+   - "Change Color" to change colors
+   - "Manage Exception Sites" to manage exception sites
+3. **Usage**: Script works automatically, no intervention needed
 
-## Tương thích
+## Compatibility
 
 - ✅ Chrome + Tampermonkey
 - ✅ Firefox + Greasemonkey/Tampermonkey  
 - ✅ Edge + Tampermonkey
 - ✅ All modern browsers
 - ✅ HTTP/HTTPS sites
-- ✅ Static và Dynamic websites
+- ✅ Static and Dynamic websites
