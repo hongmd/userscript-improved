@@ -2,7 +2,7 @@
 // @name        Visited Links Enhanced
 // @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.2.4
+// @version     0.2.5
 // @include     http*
 // @include     https*
 // @match       http://*/*
@@ -24,16 +24,18 @@
   "use strict";
 
   // ScriptCat & Browser Compatibility Detection
-  const ENVIRONMENT = {
-    isScriptCat: GM_info?.scriptHandler === "ScriptCat",
-    isFirefox: navigator.userAgent.toLowerCase().includes("firefox"),
-    isTampermonkey: GM_info?.scriptHandler === "Tampermonkey",
-    isGreasemonkey: GM_info?.scriptHandler === "Greasemonkey",
-
-    // Feature detection
-    hasStorage: typeof GM_setValue !== "undefined" && typeof GM_getValue !== "undefined",
-    hasMenuCommand: typeof GM_registerMenuCommand !== "undefined",
-  };
+  const ENVIRONMENT = (function () {
+    const handler = (typeof GM_info !== "undefined" && GM_info && GM_info.scriptHandler) || "";
+    return {
+      isScriptCat: handler === "ScriptCat",
+      isFirefox: (navigator.userAgent || "").toLowerCase().indexOf("firefox") !== -1,
+      isTampermonkey: handler === "Tampermonkey",
+      isGreasemonkey: handler === "Greasemonkey",
+      // Feature detection
+      hasStorage: typeof GM_setValue !== "undefined" && typeof GM_getValue !== "undefined",
+      hasMenuCommand: typeof GM_registerMenuCommand !== "undefined",
+    };
+  })();
 
   // Compatibility logging
   console.log("[Visited Links Enhanced] Environment detected:", {
@@ -119,7 +121,14 @@
       try {
         return new URL(url).hostname;
       } catch (e) {
-        return "";
+        // Fallback for older engines: use an anchor element
+        try {
+          const a = document.createElement("a");
+          a.href = url;
+          return a.hostname || "";
+        } catch (_) {
+          return "";
+        }
       }
     },
 
@@ -190,12 +199,13 @@
     },
 
     isExceptSite(url) {
-      const exceptSites = this.get("EXCEPT_SITES")
-        ?.split(",")
-        ?.map((site) => site.trim().toLowerCase())
-        ?.filter((site) => site.length > 0) ?? [];
+      var raw = this.get("EXCEPT_SITES");
+      var exceptSites = [];
+      if (typeof raw === "string" && raw.length) {
+        exceptSites = raw.split(",").map(function(site){ return site.trim().toLowerCase(); }).filter(function(site){ return site.length > 0; });
+      }
 
-      const currentDomain = Utils.getDomain(url)?.toLowerCase() ?? "";
+      var currentDomain = (Utils.getDomain(url) || "").toLowerCase();
 
       return exceptSites.some((site) => {
         // Remove protocol and www prefix for comparison
@@ -219,15 +229,18 @@
 
     createStyleElement() {
       // Remove existing style if present
-      document.getElementById(CONFIG.STYLE_ID)?.remove();
+      (function () {
+        const prev = document.getElementById(CONFIG.STYLE_ID);
+        if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+      })();
 
       this.styleElement = document.createElement("style");
       this.styleElement.id = CONFIG.STYLE_ID;
       this.styleElement.type = "text/css";
 
       // Try to append to head, fallback to document
-      const target = document.head ?? document.documentElement;
-      target?.appendChild(this.styleElement);
+      const target = document.head || document.documentElement || document.body || document;
+      if (target && target.appendChild) target.appendChild(this.styleElement);
 
       // Return the created element for callers that expect a value
       return this.styleElement;
@@ -241,7 +254,7 @@
 
       const color = ConfigManager.get("COLOR");
       if (Utils.isValidColor(color)) {
-        const css = CONFIG.CSS_TEMPLATE.replaceAll("%COLOR%", color);
+        const css = CONFIG.CSS_TEMPLATE.replace(/%COLOR%/g, color);
         this.styleElement.textContent = css;
       }
     },
@@ -413,7 +426,10 @@
 
     createColorPicker() {
       // Remove existing picker if present
-      document.getElementById("visited-links-color-picker")?.remove();
+      (function(){
+        var ex = document.getElementById("visited-links-color-picker");
+        if (ex && ex.parentNode) ex.parentNode.removeChild(ex);
+      })();
 
       const currentColor = ConfigManager.get("COLOR");
 
@@ -551,9 +567,8 @@
       };
 
       picker.querySelector("#apply-color").onclick = () => {
-        const selectedColor = picker
-          .querySelector("#custom-color-text")
-          ?.value?.trim();
+        const inputEl = picker.querySelector("#custom-color-text");
+        const selectedColor = inputEl && inputEl.value ? inputEl.value.trim() : "";
         if (selectedColor && Utils.isValidColor(selectedColor)) {
           ConfigManager.set("COLOR", selectedColor);
           StyleManager.updateStyles();
@@ -576,7 +591,7 @@
 
       overlay.onclick = (e) => {
         if (e.target === overlay) {
-          overlay.remove();
+          if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
         }
       };
 
@@ -655,15 +670,15 @@
       document.body.appendChild(notification);
 
       // Fade in
-      setTimeout(() => {
+      setTimeout(function(){
         notification.style.setProperty("opacity", "1", "important");
       }, 10);
 
       // Auto remove
-      setTimeout(() => {
+      setTimeout(function(){
         notification.style.setProperty("opacity", "0", "important");
-        setTimeout(() => {
-          notification.parentNode?.removeChild(notification);
+        setTimeout(function(){
+          if (notification.parentNode) notification.parentNode.removeChild(notification);
         }, 300);
       }, 3000);
     },
@@ -676,7 +691,7 @@
       );
 
       if (newExceptions !== null) {
-        const sanitizedExceptions = Utils.sanitizeInput(newExceptions?.trim() ?? "");
+        const sanitizedExceptions = Utils.sanitizeInput(newExceptions ? newExceptions.trim() : "");
         ConfigManager.set("EXCEPT_SITES", sanitizedExceptions);
         this.showNotification("Exception sites updated!", "success");
 
@@ -710,7 +725,7 @@
 
     checkAndApplyStyles() {
       const isEnabled = ConfigManager.get("ENABLED");
-      const currentUrl = document.documentURI ?? window.location.href;
+      const currentUrl = document.documentURI || window.location.href;
 
       if (isEnabled && !ConfigManager.isExceptSite(currentUrl)) {
         StyleManager.updateStyles();
