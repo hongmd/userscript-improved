@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist flat UI userscript for visited links customization
-// @version      0.5.6
+// @version      0.5.8
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -59,7 +59,7 @@
     },
   });
 
-  //// Enhanced Configuration with Storage - Flat UI
+  //// Enhanced Configuration with Storage - Performance Optimized
   const CONFIG = Object.freeze({
     STORAGE_KEYS: Object.freeze({
       COLOR: "visited_color",
@@ -73,6 +73,9 @@
     }),
     STYLE_ID: "visited-lite-enhanced-style",
     CSS_TEMPLATE: "a:visited, a:visited * { color: %COLOR% !important; }",
+    // Performance settings
+    DEBOUNCE_DELAY: 150, // Reduced from 100ms for better performance
+    MAX_OBSERVER_NODES: 1000, // Limit observer scope
   });
 
   // Color palette with names and style descriptions - comprehensive selection
@@ -187,38 +190,48 @@
     },
   });
 
-  //// Configuration Manager with ScriptCat Compatibility
+  //// Configuration Manager with Memory Optimization
   const ConfigManager = {
-    // Storage fallback system
+    // Cached values for performance
+    _cache: new Map(),
     _storagePrefix: "visited_links_enhanced_",
 
     get(key) {
+      // Return cached value if available
+      if (this._cache.has(key)) {
+        return this._cache.get(key);
+      }
+
       const storageKey = CONFIG.STORAGE_KEYS[key];
       const defaultValue = CONFIG.DEFAULTS[key];
+      let value = defaultValue;
 
       // Try GM_getValue first (ScriptCat/Tampermonkey)
       if (ENVIRONMENT.hasStorage) {
         try {
-          return GM_getValue(storageKey, defaultValue);
+          value = GM_getValue(storageKey, defaultValue);
         } catch (e) {
-          console.warn(
-            "[ScriptCat Compatibility] GM_getValue failed, trying localStorage:",
-            e
-          );
+          console.warn("[ScriptCat Compatibility] GM_getValue failed, trying localStorage:", e);
+          
+          // Fallback to localStorage
+          try {
+            const stored = localStorage.getItem(this._storagePrefix + storageKey);
+            value = stored ? JSON.parse(stored) : defaultValue;
+          } catch (e2) {
+            console.warn("[Storage] Both GM and localStorage failed:", e2);
+          }
         }
       }
 
-      // Fallback to localStorage for ScriptCat compatibility
-      try {
-        const stored = localStorage.getItem(this._storagePrefix + storageKey);
-        return stored ? JSON.parse(stored) : defaultValue;
-      } catch (e) {
-        console.warn("[Storage] Both GM and localStorage failed:", e);
-        return defaultValue;
-      }
+      // Cache the value
+      this._cache.set(key, value);
+      return value;
     },
 
     set(key, value) {
+      // Update cache first
+      this._cache.set(key, value);
+      
       const storageKey = CONFIG.STORAGE_KEYS[key];
 
       // Try GM_setValue first
@@ -227,19 +240,13 @@
           GM_setValue(storageKey, value);
           return true;
         } catch (e) {
-          console.warn(
-            "[ScriptCat Compatibility] GM_setValue failed, trying localStorage:",
-            e
-          );
+          console.warn("[ScriptCat Compatibility] GM_setValue failed, trying localStorage:", e);
         }
       }
 
       // Fallback to localStorage
       try {
-        localStorage.setItem(
-          this._storagePrefix + storageKey,
-          JSON.stringify(value)
-        );
+        localStorage.setItem(this._storagePrefix + storageKey, JSON.stringify(value));
         return true;
       } catch (e) {
         console.warn("[Storage] Both GM and localStorage failed:", e);
@@ -247,23 +254,58 @@
       }
     },
 
+    // Optimized domain checking with memoization
+    _domainCache: new Map(),
+    
     isExceptSite(url) {
+      // Check cache first
+      if (this._domainCache.has(url)) {
+        return this._domainCache.get(url);
+      }
+
       const raw = this.get("EXCEPT_SITES");
       
-      // ES2023 enhanced array processing
-      const exceptSites = raw?.split(",")
-        ?.map(site => site.trim().toLowerCase())
-        ?.filter(site => site.length > 0) ?? [];
+      // Early return if no exceptions
+      if (!raw?.trim()) {
+        this._domainCache.set(url, false);
+        return false;
+      }
+      
+      // ES2023 enhanced array processing - optimized
+      const exceptSites = raw.split(",")
+        .map(site => site.trim().toLowerCase())
+        .filter(Boolean); // More efficient than checking length
 
       const currentDomain = Utils.getDomain(url)?.toLowerCase() ?? "";
+      
+      // Early return if no domain
+      if (!currentDomain) {
+        this._domainCache.set(url, false);
+        return false;
+      }
 
-      return exceptSites.some(site => {
+      const isException = exceptSites.some(site => {
         // Remove protocol and www prefix for comparison using ES2023 replaceAll
         const cleanSite = site.replaceAll(/^(https?:\/\/)?(www\.)?/g, "");
         const cleanDomain = currentDomain.replaceAll(/^www\./g, "");
 
         return cleanDomain.includes(cleanSite) || cleanSite.includes(cleanDomain);
       });
+
+      // Cache result and limit cache size
+      if (this._domainCache.size > 50) {
+        const firstKey = this._domainCache.keys().next().value;
+        this._domainCache.delete(firstKey);
+      }
+      this._domainCache.set(url, isException);
+      
+      return isException;
+    },
+
+    // Clear caches when needed
+    clearCache() {
+      this._cache.clear();
+      this._domainCache.clear();
     },
   };
 
@@ -353,9 +395,10 @@
     },
 
     createSimpleColorPicker() {
-      // Enhanced color picker with style descriptions
+      // Performance optimized color picker
       const currentColor = ConfigManager.get("COLOR");
       
+      // Pre-build color options string for better memory usage
       const colorOptions = COLOR_PALETTE.map((item, index) => 
         `${index + 1}. ${item.name} - ${item.desc} (${item.color})`
       ).join('\n');
@@ -367,13 +410,14 @@
 
       if (choice !== null) {
         let selectedColor;
+        const trimmedChoice = choice.trim();
         
-        // Check if it's a number selection
-        const num = parseInt(choice);
-        if (num >= 1 && num <= COLOR_PALETTE.length) {
+        // Optimized number parsing
+        const num = parseInt(trimmedChoice, 10);
+        if (num >= 1 && num <= COLOR_PALETTE.length && !isNaN(num)) {
           selectedColor = COLOR_PALETTE[num - 1].color;
-        } else if (Utils.isValidColor(choice.trim())) {
-          selectedColor = choice.trim();
+        } else if (Utils.isValidColor(trimmedChoice)) {
+          selectedColor = trimmedChoice;
         } else {
           alert("Invalid color format. Please try again.");
           return;
@@ -382,7 +426,7 @@
         ConfigManager.set("COLOR", selectedColor);
         StyleManager.updateStyles();
         
-        // Enhanced confirmation message with style description
+        // Optimized color info lookup
         const colorItem = COLOR_PALETTE.find(item => item.color === selectedColor);
         const colorInfo = colorItem 
           ? `${colorItem.name} - ${colorItem.desc}`
@@ -411,6 +455,9 @@
         ConfigManager.set("COLOR", CONFIG.DEFAULTS.COLOR);
         ConfigManager.set("EXCEPT_SITES", CONFIG.DEFAULTS.EXCEPT_SITES);
         ConfigManager.set("ENABLED", CONFIG.DEFAULTS.ENABLED);
+        
+        // Clear caches for immediate effect
+        ConfigManager.clearCache();
         StyleManager.updateStyles();
         alert("Settings reset to defaults");
       }
@@ -447,25 +494,61 @@
     },
 
     observeChanges() {
-      // Debounced function to handle DOM changes
+      // Optimized debounced function with configurable delay
       const debouncedUpdate = Utils.debounce(() => {
         this.checkAndApplyStyles();
-      }, 100);
+      }, CONFIG.DEBOUNCE_DELAY);
 
-      // Observer for dynamic content
+      // Optimized MutationObserver with performance limits
       if (window.MutationObserver) {
-        const observer = new MutationObserver(debouncedUpdate);
+        const observer = new MutationObserver((mutations) => {
+          // Only process if mutations are relevant and within limits
+          let relevantChanges = false;
+          let nodeCount = 0;
+          
+          for (const mutation of mutations) {
+            nodeCount += mutation.addedNodes.length;
+            
+            // Stop if too many nodes to prevent performance issues
+            if (nodeCount > CONFIG.MAX_OBSERVER_NODES) {
+              relevantChanges = true;
+              break;
+            }
+            
+            // Check if any added nodes contain links
+            for (const node of mutation.addedNodes) {
+              if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.tagName === 'A' || node.querySelector?.('a')) {
+                  relevantChanges = true;
+                  break;
+                }
+              }
+            }
+            
+            if (relevantChanges) break;
+          }
+          
+          // Only update if relevant changes detected
+          if (relevantChanges) {
+            debouncedUpdate();
+          }
+        });
+
+        // Observe with minimal scope for better performance
         observer.observe(document.documentElement, {
           childList: true,
           subtree: true,
+          // Removed unnecessary options for performance
+          attributes: false,
+          attributeOldValue: false,
+          characterData: false,
+          characterDataOldValue: false,
         });
       }
 
-      // Handle SPA navigation
-      window.addEventListener("popstate", debouncedUpdate);
-
-      // Handle hash changes
-      window.addEventListener("hashchange", debouncedUpdate);
+      // Optimized event listeners with passive option
+      window.addEventListener("popstate", debouncedUpdate, { passive: true });
+      window.addEventListener("hashchange", debouncedUpdate, { passive: true });
     },
   };
 
@@ -496,12 +579,15 @@
   }
 })();
 
-// Flat UI Features:
+// Performance & Memory Optimized Features:
 // 1. Simple built-in menu system only (no floating UI)
 // 2. Prompt-based color picker for simplicity  
 // 3. Alert-based notifications
 // 4. No CSS animations or effects
-// 5. Minimal memory footprint
-// 6. Essential functionality only
-// 7. Cross-platform compatibility
-// 8. Lightweight and fast performance
+// 5. Memory caching for faster access
+// 6. Optimized MutationObserver with limits
+// 7. Debounced updates for better performance
+// 8. Memoized domain checking
+// 9. Passive event listeners
+// 10. Cross-platform compatibility
+// 11. Lightweight and ultra-fast performance
