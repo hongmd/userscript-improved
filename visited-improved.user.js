@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Visited Links Enhanced
-// @namespace   iFantz7E.VisitedLiteEnhanced
+// @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
 // @version     0.0.2
 // @include     http*
@@ -64,7 +64,7 @@
       ENABLED: "script_enabled",
     },
     DEFAULTS: {
-      COLOR: "LightCoral",
+      COLOR: "#FF6B6B",
       EXCEPT_SITES: "mail.live.com,gmail.com",
       ENABLED: true,
     },
