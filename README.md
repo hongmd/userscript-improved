@@ -5,7 +5,6 @@ A collection of improved userscripts for better web browsing experience.
 ## Scripts
 
 - `visited-improved.user.js` - Enhanced script for tracking visited links
-- `Visited-hong.user.js` - Alternative version with different styling
 
 ## Installation
 
