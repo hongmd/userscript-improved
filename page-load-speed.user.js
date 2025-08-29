@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Page Load Speed Monitor
 // @namespace    com.userscript.page-load-speed
-// @description  Ultra-lightweight page load speed monitor - minimal CPU/RAM impact
-// @version      1.3.0
+// @description  Ultra-lightweight page load speed monitor with dark transparent UI - minimal CPU/RAM impact
+// @version      1.4.0
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -38,7 +38,7 @@
       setTimeout(() => lcpObserver.disconnect(), 8000);
     }
   } catch (e) {
-    console.log('LCP không được hỗ trợ');
+    console.log('LCP not supported');
   }
   
   // ===== TẠO CSS =====
@@ -53,39 +53,50 @@
         position: fixed;
         top: 10px;
         right: 10px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 10px 15px;
-        border-radius: 8px;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        font-weight: bold;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        color: #ffffff;
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
+        font-weight: 500;
         z-index: 9999999;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         user-select: none;
+        opacity: 0.9;
       }
       #speed-box:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        opacity: 1;
+        background: rgba(0, 0, 0, 0.9);
       }
       #speed-box.expanded {
-        min-width: 250px;
+        min-width: 280px;
+        padding: 16px 20px;
       }
       #close-btn {
         float: right;
-        margin-left: 10px;
+        margin-left: 12px;
         cursor: pointer;
         font-weight: bold;
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
       }
       #close-btn:hover {
+        opacity: 1;
         color: #ff6b6b;
       }
       #details {
         display: none;
-        margin-top: 10px;
-        font-size: 12px;
+        margin-top: 12px;
+        font-size: 11px;
+        opacity: 0.9;
       }
       #details.show {
         display: block;
@@ -93,11 +104,19 @@
       .metric {
         display: flex;
         justify-content: space-between;
-        margin: 5px 0;
+        margin: 6px 0;
+        padding: 2px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .metric:last-child {
+        border-bottom: none;
       }
       .good { color: #4ade80; }
       .medium { color: #fbbf24; }
       .poor { color: #f87171; }
+      .metric-label {
+        opacity: 0.8;
+      }
     `;
     
     const style = document.createElement('style');
@@ -115,23 +134,23 @@
     const box = document.createElement('div');
     box.id = 'speed-box';
     box.innerHTML = `
-      <div id="main">⚡ Đang đo...</div>
-      <span id="close-btn" title="Đóng">×</span>
+      <div id="main">⚡ Measuring...</div>
+      <span id="close-btn" title="Close">×</span>
       <div id="details">
         <div class="metric">
-          <span>DOM Content Loaded:</span>
+          <span class="metric-label">DOM Content Loaded:</span>
           <span id="dcl-time">-</span>
         </div>
         <div class="metric">
-          <span>First Paint:</span>
+          <span class="metric-label">First Paint:</span>
           <span id="fp-time">-</span>
         </div>
         <div class="metric">
-          <span>First Contentful Paint:</span>
+          <span class="metric-label">First Contentful Paint:</span>
           <span id="fcp-time">-</span>
         </div>
         <div class="metric">
-          <span>Largest Contentful Paint:</span>
+          <span class="metric-label">Largest Contentful Paint:</span>
           <span id="lcp-time">-</span>
         </div>
       </div>
@@ -282,15 +301,15 @@
   
   // Menu báo cáo hiệu suất
   if (typeof GM_registerMenuCommand !== 'undefined') {
-    GM_registerMenuCommand('📊 Báo cáo hiệu suất', () => {
+    GM_registerMenuCommand('📊 Performance Report', () => {
       const timings = getPageTimings();
       
-      alert(`🚀 BÁO CÁO HIỆU SUẤT:
+      alert(`🚀 PERFORMANCE REPORT:
       
-⏱️ Tổng thời gian: ${timings.loadTime}ms
+⏱️ Total Load Time: ${timings.loadTime}ms
 📄 DOM Content Loaded: ${timings.dcl}ms
 🖼️ First Paint: ${timings.fp}ms
-�️ First Contentful Paint: ${timings.fcp}ms
+🖌️ First Contentful Paint: ${timings.fcp}ms
 📸 Largest Contentful Paint: ${lcpTime}ms
 
 🌐 ${window.location.hostname}
