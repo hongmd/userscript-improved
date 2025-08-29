@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist flat UI userscript for visited links customization
-// @version      0.5.3
+// @version      0.5.4
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -77,30 +77,30 @@
 
   // Pastel color palette with names - soft and eye-friendly colors
   const COLOR_PALETTE = Object.freeze([
-    { color: "#93c5fd", name: "Pastel Blue" },
-    { color: "#fca5a5", name: "Pastel Red" },
-    { color: "#86efac", name: "Pastel Green" },
-    { color: "#fed7aa", name: "Pastel Orange" },
-    { color: "#f97316", name: "Vibrant Orange" },
-    { color: "#c4b5fd", name: "Pastel Purple" },
-    { color: "#f9a8d4", name: "Pastel Pink" },
-    { color: "#7dd3fc", name: "Pastel Sky Blue" },
-    { color: "#bef264", name: "Pastel Lime" },
-    { color: "#fde047", name: "Pastel Yellow" },
-    { color: "#fb7185", name: "Pastel Rose" },
-    { color: "#a78bfa", name: "Pastel Violet" },
-    { color: "#34d399", name: "Pastel Emerald" },
+    { color: "#93c5fd", name: "Pastel Blue", desc: "Light sky blue, gentle & calming" },
+    { color: "#fca5a5", name: "Pastel Red", desc: "Soft coral red, warm & friendly" },
+    { color: "#86efac", name: "Pastel Green", desc: "Fresh mint green, natural & soothing" },
+    { color: "#fed7aa", name: "Pastel Orange", desc: "Soft peach orange, warm & cozy" },
+    { color: "#f97316", name: "Vibrant Orange", desc: "Bold bright orange, energetic & eye-catching" },
+    { color: "#c4b5fd", name: "Pastel Purple", desc: "Light lavender purple, elegant & dreamy" },
+    { color: "#f9a8d4", name: "Pastel Pink", desc: "Soft rose pink, delicate & charming" },
+    { color: "#7dd3fc", name: "Pastel Sky Blue", desc: "Clear sky blue, fresh & airy" },
+    { color: "#bef264", name: "Pastel Lime", desc: "Bright lime green, vibrant & fresh" },
+    { color: "#fde047", name: "Pastel Yellow", desc: "Sunshine yellow, cheerful & bright" },
+    { color: "#fb7185", name: "Pastel Rose", desc: "Deep rose pink, romantic & warm" },
+    { color: "#a78bfa", name: "Pastel Violet", desc: "Rich violet purple, mystical & creative" },
+    { color: "#34d399", name: "Pastel Emerald", desc: "Vibrant emerald green, luxurious & rich" },
     // Highlight colors for better link visibility
-    { color: "#dc2626", name: "Bold Red" },
-    { color: "#2563eb", name: "Bold Blue" },
-    { color: "#059669", name: "Bold Green" },
-    { color: "#7c3aed", name: "Bold Purple" },
-    { color: "#db2777", name: "Bold Pink" },
-    { color: "#ea580c", name: "Bold Orange" },
-    { color: "#0891b2", name: "Bold Cyan" },
-    { color: "#65a30d", name: "Bold Lime" },
-    { color: "#ca8a04", name: "Bold Yellow" },
-    { color: "#be123c", name: "Bold Rose" },
+    { color: "#dc2626", name: "Bold Red", desc: "Strong crimson red, powerful & attention-grabbing" },
+    { color: "#2563eb", name: "Bold Blue", desc: "Deep ocean blue, professional & trustworthy" },
+    { color: "#059669", name: "Bold Green", desc: "Forest green, stable & confident" },
+    { color: "#7c3aed", name: "Bold Purple", desc: "Royal purple, sophisticated & premium" },
+    { color: "#db2777", name: "Bold Pink", desc: "Magenta pink, bold & expressive" },
+    { color: "#ea580c", name: "Bold Orange", desc: "Fiery orange, dynamic & enthusiastic" },
+    { color: "#0891b2", name: "Bold Cyan", desc: "Electric cyan, modern & tech-savvy" },
+    { color: "#65a30d", name: "Bold Lime", desc: "Electric lime, energetic & youthful" },
+    { color: "#ca8a04", name: "Bold Yellow", desc: "Golden yellow, prestigious & valuable" },
+    { color: "#be123c", name: "Bold Rose", desc: "Deep wine red, elegant & sophisticated" },
   ]);
 
   //// Utility Functions - ES2023 Enhanced
@@ -340,15 +340,15 @@
     },
 
     createSimpleColorPicker() {
-      // Simple prompt-based color picker with color names
+      // Enhanced prompt-based color picker with detailed descriptions
       const currentColor = ConfigManager.get("COLOR");
       
       const colorOptions = COLOR_PALETTE.map((item, index) => 
-        `${index + 1}. ${item.name} (${item.color})`
+        `${index + 1}. ${item.name} (${item.color}) - ${item.desc}`
       ).join('\n');
       
       const choice = prompt(
-        `Choose a color for visited links:\n\n${colorOptions}\n\nEnter number (1-${COLOR_PALETTE.length}) or custom color code:`,
+        `🎨 Choose a color for visited links:\n\n${colorOptions}\n\n💡 Enter number (1-${COLOR_PALETTE.length}) or custom color code:`,
         currentColor
       );
 
@@ -362,7 +362,7 @@
         } else if (Utils.isValidColor(choice.trim())) {
           selectedColor = choice.trim();
         } else {
-          alert("Invalid color format. Please try again.");
+          alert("❌ Invalid color format. Please try again.");
           return;
         }
 
@@ -372,7 +372,7 @@
         // Find color name for confirmation message
         const colorItem = COLOR_PALETTE.find(item => item.color === selectedColor);
         const colorName = colorItem ? colorItem.name : "Custom Color";
-        alert(`Color changed to: ${colorName} (${selectedColor})`);
+        alert(`✅ Color changed to: ${colorName} (${selectedColor})`);
       }
     },
 
