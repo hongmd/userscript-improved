@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist flat UI userscript for visited links customization
-// @version      0.5.1
+// @version      0.5.2
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -75,20 +75,20 @@
     CSS_TEMPLATE: "a:visited, a:visited * { color: %COLOR% !important; }",
   });
 
-  // Pastel color palette - soft and eye-friendly colors
+  // Pastel color palette with names - soft and eye-friendly colors
   const COLOR_PALETTE = Object.freeze([
-    "#93c5fd", // Pastel Blue
-    "#fca5a5", // Pastel Red
-    "#86efac", // Pastel Green
-    "#fed7aa", // Pastel Orange
-    "#c4b5fd", // Pastel Purple
-    "#f9a8d4", // Pastel Pink
-    "#7dd3fc", // Pastel Sky Blue
-    "#bef264", // Pastel Lime
-    "#fde047", // Pastel Yellow
-    "#fb7185", // Pastel Rose
-    "#a78bfa", // Pastel Violet
-    "#34d399", // Pastel Emerald
+    { color: "#93c5fd", name: "Pastel Blue" },
+    { color: "#fca5a5", name: "Pastel Red" },
+    { color: "#86efac", name: "Pastel Green" },
+    { color: "#fed7aa", name: "Pastel Orange" },
+    { color: "#c4b5fd", name: "Pastel Purple" },
+    { color: "#f9a8d4", name: "Pastel Pink" },
+    { color: "#7dd3fc", name: "Pastel Sky Blue" },
+    { color: "#bef264", name: "Pastel Lime" },
+    { color: "#fde047", name: "Pastel Yellow" },
+    { color: "#fb7185", name: "Pastel Rose" },
+    { color: "#a78bfa", name: "Pastel Violet" },
+    { color: "#34d399", name: "Pastel Emerald" },
   ]);
 
   //// Utility Functions - ES2023 Enhanced
@@ -328,11 +328,11 @@
     },
 
     createSimpleColorPicker() {
-      // Simple prompt-based color picker
+      // Simple prompt-based color picker with color names
       const currentColor = ConfigManager.get("COLOR");
       
-      const colorOptions = COLOR_PALETTE.map((color, index) => 
-        `${index + 1}. ${color}`
+      const colorOptions = COLOR_PALETTE.map((item, index) => 
+        `${index + 1}. ${item.name} (${item.color})`
       ).join('\n');
       
       const choice = prompt(
@@ -346,7 +346,7 @@
         // Check if it's a number selection
         const num = parseInt(choice);
         if (num >= 1 && num <= COLOR_PALETTE.length) {
-          selectedColor = COLOR_PALETTE[num - 1];
+          selectedColor = COLOR_PALETTE[num - 1].color;
         } else if (Utils.isValidColor(choice.trim())) {
           selectedColor = choice.trim();
         } else {
@@ -356,7 +356,11 @@
 
         ConfigManager.set("COLOR", selectedColor);
         StyleManager.updateStyles();
-        alert(`Color changed to: ${selectedColor}`);
+        
+        // Find color name for confirmation message
+        const colorItem = COLOR_PALETTE.find(item => item.color === selectedColor);
+        const colorName = colorItem ? colorItem.name : "Custom Color";
+        alert(`Color changed to: ${colorName} (${selectedColor})`);
       }
     },
 
