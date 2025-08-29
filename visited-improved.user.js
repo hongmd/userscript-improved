@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Visited Links Enhanced
+// @name         Visited Links Enhanced - Minimalist UI
 // @namespace    com.userscript.visited-links-enhanced
-// @description  Enhanced userscript to mark visited links with custom colors and improved performance
-// @version      0.3.1
+// @description  Minimalist userscript with dark/light mode for visited links customization
+// @version      0.4.0
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -65,22 +65,47 @@
       COLOR: "visited_color",
       EXCEPT_SITES: "except_sites",
       ENABLED: "script_enabled",
+      THEME_MODE: "theme_mode", // New: dark/light theme
+      UI_COMPACT: "ui_compact", // New: compact mode
     }),
     DEFAULTS: Object.freeze({
-      COLOR: "#FF6B6B",
+      COLOR: "#6366f1", // Modern indigo color
       EXCEPT_SITES: "mail.live.com,gmail.com",
       ENABLED: true,
+      THEME_MODE: "auto", // auto, light, dark
+      UI_COMPACT: true,
     }),
     STYLE_ID: "visited-lite-enhanced-style",
-    CSS_TEMPLATE: "a:visited, a:visited * { color: %COLOR% !important; transition: color 0.2s ease; }",
+    CSS_TEMPLATE: "a:visited, a:visited * { color: %COLOR% !important; transition: color 0.15s ease; }",
+    
+    // Theme configurations
+    THEMES: Object.freeze({
+      light: Object.freeze({
+        bg: "#ffffff",
+        bgSecondary: "#f8fafc",
+        text: "#1e293b",
+        textSecondary: "#64748b",
+        border: "#e2e8f0",
+        shadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+        accent: "#6366f1",
+      }),
+      dark: Object.freeze({
+        bg: "#0f172a",
+        bgSecondary: "#1e293b",
+        text: "#f1f5f9",
+        textSecondary: "#94a3b8",
+        border: "#334155",
+        shadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
+        accent: "#818cf8",
+      }),
+    }),
   });
 
   // Enhanced color palette with better accessibility - ES2023 with immutable array
   const COLOR_PALETTE = Object.freeze([
-    "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FECA57",
-    "#FF9FF3", "#54A0FF", "#5F27CD", "#00D2D3", "#FF9F43",
-    "#EE5A24", "#0984E3", "#A29BFE", "#FD79A8", "#E17055",
-    "#00B894", "#FDCB6E", "#6C5CE7", "#74B9FF", "#00CEC9",
+    "#6366f1", "#8b5cf6", "#ec4899", "#ef4444", "#f97316", 
+    "#eab308", "#22c55e", "#10b981", "#06b6d4", "#3b82f6",
+    "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#f43f5e",
   ]);
 
   //// Utility Functions - ES2023 Enhanced
@@ -146,6 +171,27 @@
         }
       }
       return undefined;
+    },
+
+    // Detect system theme preference
+    getSystemTheme: () => {
+      try {
+        if (window.matchMedia) {
+          return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+      } catch {
+        // Fallback for older browsers
+      }
+      return "light";
+    },
+
+    // Get current theme based on settings
+    getCurrentTheme: () => {
+      const themeMode = ConfigManager.get("THEME_MODE");
+      if (themeMode === "auto") {
+        return Utils.getSystemTheme();
+      }
+      return themeMode;
     },
   });
 
@@ -312,50 +358,63 @@
 
     // Fallback floating menu for when GM_registerMenuCommand is not available - ES2023 Enhanced
     createFloatingMenu() {
-      // Create floating menu button with ES2023 Object.assign
+      // Create minimalist floating menu button
+      const currentTheme = Utils.getCurrentTheme();
+      const theme = CONFIG.THEMES[currentTheme];
+      const isCompact = ConfigManager.get("UI_COMPACT");
+      
       const menuButton = Object.assign(document.createElement("div"), {
         id: "visited-links-menu-button",
-        innerHTML: "🎨"
+        innerHTML: `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="m12 1 0 6m0 6 0 6m11-7-6 0m-6 0-6 0"/>
+          </svg>
+        `
       });
 
-      // ES2023 enhanced styling with template literals
+      // Minimalist button styling
       Object.assign(menuButton.style, {
         position: "fixed",
-        top: "20px",
-        right: "20px",
-        width: "40px",
-        height: "40px",
-        background: "#4CAF50",
-        borderRadius: "50%",
+        top: isCompact ? "12px" : "20px",
+        right: isCompact ? "12px" : "20px",
+        width: isCompact ? "32px" : "40px",
+        height: isCompact ? "32px" : "40px",
+        background: theme.bg,
+        border: `1px solid ${theme.border}`,
+        borderRadius: isCompact ? "6px" : "8px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         cursor: "pointer",
         zIndex: "999998",
-        fontSize: "18px",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
-        transition: "all 0.3s ease",
-        opacity: "0.8"
+        color: theme.text,
+        boxShadow: theme.shadow,
+        transition: "all 0.2s ease",
+        opacity: "0.9",
+        backdropFilter: "blur(10px)",
       });
 
-      // ES2023 enhanced event handlers
+      // Hover effects
       menuButton.addEventListener("mouseenter", () => {
         Object.assign(menuButton.style, {
           opacity: "1",
-          transform: "scale(1.1)"
+          transform: "scale(1.05)",
+          boxShadow: `0 4px 12px ${theme.accent}20`,
         });
       });
 
       menuButton.addEventListener("mouseleave", () => {
         Object.assign(menuButton.style, {
-          opacity: "0.8",
-          transform: "scale(1)"
+          opacity: "0.9",
+          transform: "scale(1)",
+          boxShadow: theme.shadow,
         });
       });
 
-      menuButton.addEventListener("click", () => this.showFloatingMenu());
+      menuButton.addEventListener("click", () => this.showMinimalistMenu());
 
-      // Add to page when DOM is ready with ES2023 queueMicrotask
+      // Add to page when DOM is ready
       const addMenu = () => {
         if (document.body) {
           document.body.appendChild(menuButton);
@@ -366,49 +425,89 @@
       addMenu();
     },
 
-    showFloatingMenu() {
-      // Remove existing menu with ES2023 optional chaining
+    showMinimalistMenu() {
+      // Remove existing menu
       document.getElementById("visited-links-floating-menu")?.remove();
+
+      const currentTheme = Utils.getCurrentTheme();
+      const theme = CONFIG.THEMES[currentTheme];
+      const isCompact = ConfigManager.get("UI_COMPACT");
 
       const menu = Object.assign(document.createElement("div"), {
         id: "visited-links-floating-menu"
       });
 
-      // ES2023 enhanced styling
+      // Minimalist menu styling
       Object.assign(menu.style, {
         position: "fixed",
-        top: "70px",
-        right: "20px",
-        background: "white",
-        borderRadius: "8px",
-        boxShadow: "0 5px 15px rgba(0,0,0,0.3)",
+        top: isCompact ? "52px" : "70px",
+        right: isCompact ? "12px" : "20px",
+        background: theme.bg,
+        border: `1px solid ${theme.border}`,
+        borderRadius: isCompact ? "8px" : "12px",
+        boxShadow: `0 8px 32px ${theme.text}10, ${theme.shadow}`,
         zIndex: "999999",
         overflow: "hidden",
-        minWidth: "200px"
+        minWidth: isCompact ? "160px" : "200px",
+        backdropFilter: "blur(20px)",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontSize: isCompact ? "13px" : "14px",
       });
 
-      // ES2023 enhanced menu items with immutable array
+      // Minimalist menu items
       const menuItems = Object.freeze([
-        { text: "🎨 Change Color", action: () => this.changeColor() },
-        { text: "⚙️ Toggle Script", action: () => this.toggleScript() },
-        { text: "🚫 Manage Exceptions", action: () => this.manageExceptions() },
+        { 
+          icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 8a2 2 0 0 0-2 2"/></svg>`, 
+          text: "Color", 
+          action: () => this.changeColor() 
+        },
+        { 
+          icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>`, 
+          text: "Toggle", 
+          action: () => this.toggleScript() 
+        },
+        { 
+          icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`, 
+          text: "Exclude", 
+          action: () => this.manageExceptions() 
+        },
+        { 
+          icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`, 
+          text: currentTheme === "dark" ? "Light" : "Dark", 
+          action: () => this.toggleTheme() 
+        },
       ]);
 
-      // Create menu items with ES2023 for...of and enhanced object methods
+      // Create menu items
       for (const item of menuItems) {
-        const button = Object.assign(document.createElement("div"), {
-          textContent: item.text
-        });
+        const button = document.createElement("div");
+        button.innerHTML = `
+          <span style="display: flex; align-items: center; color: ${theme.textSecondary};">${item.icon}</span>
+          <span>${item.text}</span>
+        `;
 
         Object.assign(button.style, {
-          padding: "12px 15px",
+          display: "flex",
+          alignItems: "center",
+          gap: isCompact ? "8px" : "12px",
+          padding: isCompact ? "8px 12px" : "12px 16px",
           cursor: "pointer",
-          borderBottom: "1px solid #eee",
-          transition: "background 0.2s ease"
+          color: theme.text,
+          borderBottom: `1px solid ${theme.border}`,
+          transition: "all 0.15s ease",
+          fontSize: "inherit",
         });
 
-        button.addEventListener("mouseenter", () => button.style.background = "#f5f5f5");
-        button.addEventListener("mouseleave", () => button.style.background = "white");
+        button.addEventListener("mouseenter", () => {
+          button.style.background = theme.bgSecondary;
+          button.style.color = theme.accent;
+        });
+        
+        button.addEventListener("mouseleave", () => {
+          button.style.background = "transparent";
+          button.style.color = theme.text;
+        });
+        
         button.addEventListener("click", () => {
           item.action();
           menu.remove();
@@ -417,12 +516,41 @@
         menu.appendChild(button);
       }
 
+      // Remove border from last item
+      const lastItem = menu.lastElementChild;
+      if (lastItem) lastItem.style.borderBottom = "none";
+
       document.body.appendChild(menu);
 
-      // Auto-hide with ES2023 enhanced timeout
-      queueMicrotask(() => {
-        setTimeout(() => menu.remove(), 5000);
-      });
+      // Auto-hide menu
+      setTimeout(() => menu.remove(), 8000);
+    },
+
+    toggleTheme() {
+      const currentMode = ConfigManager.get("THEME_MODE");
+      let newMode;
+      
+      if (currentMode === "auto") {
+        newMode = Utils.getSystemTheme() === "dark" ? "light" : "dark";
+      } else if (currentMode === "light") {
+        newMode = "dark";
+      } else {
+        newMode = "light";
+      }
+      
+      ConfigManager.set("THEME_MODE", newMode);
+      this.showNotification(`Theme: ${newMode}`, "success");
+      
+      // Update floating menu if exists
+      this.updateFloatingMenuTheme();
+    },
+
+    updateFloatingMenuTheme() {
+      const menuButton = document.getElementById("visited-links-menu-button");
+      if (menuButton) {
+        menuButton.remove();
+        this.createFloatingMenu();
+      }
     },
 
     toggleScript() {
@@ -444,12 +572,15 @@
     },
 
     createColorPicker() {
-      // Remove existing picker with ES2023 optional chaining
+      // Remove existing picker
       document.getElementById("visited-links-color-picker")?.remove();
 
       const currentColor = ConfigManager.get("COLOR");
+      const currentTheme = Utils.getCurrentTheme();
+      const theme = CONFIG.THEMES[currentTheme];
+      const isCompact = ConfigManager.get("UI_COMPACT");
 
-      // Create overlay with ES2023 Object.assign
+      // Create minimalist overlay
       const overlay = Object.assign(document.createElement("div"), {
         id: "visited-links-color-picker"
       });
@@ -460,124 +591,228 @@
         left: "0",
         width: "100%",
         height: "100%",
-        background: "rgba(0, 0, 0, 0.5)",
+        background: `${theme.text}40`,
+        backdropFilter: "blur(8px)",
         zIndex: "999999",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        fontFamily: "Arial, sans-serif"
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        fontSize: isCompact ? "13px" : "14px",
       });
 
-      // Create picker dialog with enhanced ES2023 syntax
+      // Create minimalist picker dialog
       const picker = document.createElement("div");
       Object.assign(picker.style, {
-        background: "white",
-        borderRadius: "10px",
-        padding: "20px",
-        boxShadow: "0 5px 15px rgba(0, 0, 0, 0.3)",
-        maxWidth: "400px",
+        background: theme.bg,
+        border: `1px solid ${theme.border}`,
+        borderRadius: isCompact ? "12px" : "16px",
+        padding: isCompact ? "20px" : "24px",
+        boxShadow: `0 20px 60px ${theme.text}20, ${theme.shadow}`,
+        maxWidth: isCompact ? "320px" : "380px",
         width: "90%",
         maxHeight: "90vh",
-        overflowY: "auto"
+        overflowY: "auto",
+        color: theme.text,
       });
 
-      // ES2023 template literals with enhanced string interpolation
+      // Minimalist picker content
       picker.innerHTML = `
-        <h3 style="margin: 0 0 15px 0; text-align: center; color: #333;">
-          Choose Visited Link Color
-        </h3>
-        <p style="margin: 0 0 15px 0; color: #666; font-size: 14px; text-align: center;">
-          Current color: <span style="color: ${currentColor}; font-weight: bold;">${currentColor}</span>
-        </p>
-        <div id="color-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 15px;"></div>
-        <div style="margin-bottom: 15px;">
-          <label style="display: block; margin-bottom: 5px; color: #333; font-weight: bold;">Custom Color:</label>
+        <div style="margin-bottom: ${isCompact ? '16px' : '20px'};">
+          <h3 style="margin: 0; font-size: ${isCompact ? '16px' : '18px'}; font-weight: 600; color: ${theme.text};">
+            Choose Color
+          </h3>
+          <p style="margin: 8px 0 0 0; color: ${theme.textSecondary}; font-size: ${isCompact ? '12px' : '13px'};">
+            Current: <span style="color: ${currentColor}; font-weight: 500;">${currentColor}</span>
+          </p>
+        </div>
+        
+        <div id="color-grid" style="
+          display: grid; 
+          grid-template-columns: repeat(5, 1fr); 
+          gap: ${isCompact ? '6px' : '8px'}; 
+          margin-bottom: ${isCompact ? '16px' : '20px'};
+        "></div>
+        
+        <div style="margin-bottom: ${isCompact ? '16px' : '20px'};">
+          <label style="display: block; margin-bottom: 8px; color: ${theme.text}; font-weight: 500; font-size: ${isCompact ? '12px' : '13px'};">
+            Custom Color
+          </label>
           <input type="color" id="custom-color" value="${this.colorToHex(currentColor)}" 
-                 style="width: 100%; height: 40px; border: none; border-radius: 5px; cursor: pointer;">
+                 style="
+                   width: 100%; 
+                   height: ${isCompact ? '36px' : '40px'}; 
+                   border: 1px solid ${theme.border}; 
+                   border-radius: ${isCompact ? '6px' : '8px'}; 
+                   cursor: pointer;
+                   background: ${theme.bgSecondary};
+                 ">
         </div>
-        <div style="margin-bottom: 15px;">
-          <label style="display: block; margin-bottom: 5px; color: #333; font-weight: bold;">Or enter color name/code:</label>
+        
+        <div style="margin-bottom: ${isCompact ? '20px' : '24px'};">
           <input type="text" id="custom-color-text" value="${currentColor}" 
-                 placeholder="e.g., red, #FF0000, rgb(255,0,0)"
-                 style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box;">
+                 placeholder="Enter color code"
+                 style="
+                   width: 100%; 
+                   padding: ${isCompact ? '8px 12px' : '10px 14px'}; 
+                   border: 1px solid ${theme.border}; 
+                   border-radius: ${isCompact ? '6px' : '8px'}; 
+                   background: ${theme.bgSecondary};
+                   color: ${theme.text};
+                   font-size: inherit;
+                   box-sizing: border-box;
+                   transition: border-color 0.15s ease;
+                 ">
         </div>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-          <button id="apply-color" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Apply</button>
-          <button id="cancel-color" style="background: #f44336; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Cancel</button>
+        
+        <div style="display: flex; gap: ${isCompact ? '8px' : '12px'};">
+          <button id="apply-color" style="
+            flex: 1;
+            background: ${theme.accent}; 
+            color: white; 
+            border: none; 
+            padding: ${isCompact ? '8px 16px' : '10px 20px'}; 
+            border-radius: ${isCompact ? '6px' : '8px'}; 
+            cursor: pointer; 
+            font-size: inherit;
+            font-weight: 500;
+            transition: all 0.15s ease;
+          ">Apply</button>
+          <button id="cancel-color" style="
+            background: ${theme.bgSecondary}; 
+            color: ${theme.text}; 
+            border: 1px solid ${theme.border}; 
+            padding: ${isCompact ? '8px 16px' : '10px 20px'}; 
+            border-radius: ${isCompact ? '6px' : '8px'}; 
+            cursor: pointer; 
+            font-size: inherit;
+            transition: all 0.15s ease;
+          ">Cancel</button>
         </div>
       `;
 
-      // Add color grid with ES2023 for...of
+      // Add minimalist color grid
       const colorGrid = picker.querySelector("#color-grid");
       for (const color of COLOR_PALETTE) {
         const colorButton = document.createElement("div");
+        const size = isCompact ? "28px" : "32px";
+        
         Object.assign(colorButton.style, {
-          width: "40px",
-          height: "40px",
+          width: size,
+          height: size,
           backgroundColor: color,
-          borderRadius: "5px",
+          borderRadius: isCompact ? "4px" : "6px",
           cursor: "pointer",
-          border: `2px solid ${color === currentColor ? "#333" : "transparent"}`,
-          transition: "all 0.2s ease",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          position: "relative"
+          border: `2px solid ${color === currentColor ? theme.accent : 'transparent'}`,
+          transition: "all 0.15s ease",
+          position: "relative",
         });
 
         colorButton.title = color;
+        colorButton.addEventListener("mouseenter", () => {
+          if (color !== currentColor) {
+            colorButton.style.transform = "scale(1.1)";
+            colorButton.style.boxShadow = `0 2px 8px ${color}40`;
+          }
+        });
+        
+        colorButton.addEventListener("mouseleave", () => {
+          colorButton.style.transform = "scale(1)";
+          colorButton.style.boxShadow = "none";
+        });
+        
         colorButton.addEventListener("click", () => {
-          // Update inputs with ES2023 enhanced queries
           picker.querySelector("#custom-color").value = color;
           picker.querySelector("#custom-color-text").value = color;
-
-          // Update selection with ES2023 for...of
-          for (const btn of colorGrid.querySelectorAll("div")) {
-            btn.style.border = "2px solid transparent";
-          }
-          colorButton.style.border = "2px solid #333";
+          this.updateColorSelection(colorGrid, color, theme);
         });
 
         colorGrid.appendChild(colorButton);
       }
 
-      // ES2023 enhanced event listeners
-      const setupEventListeners = () => {
-        picker.querySelector("#custom-color")?.addEventListener("change", (e) => {
-          picker.querySelector("#custom-color-text").value = e.target.value;
-          this.updateColorSelection(colorGrid, e.target.value);
-        });
+      this.setupColorPickerEvents(picker, overlay, colorGrid, theme);
+      overlay.appendChild(picker);
+      document.body.appendChild(overlay);
+    },
 
-        picker.querySelector("#custom-color-text")?.addEventListener("input", (e) => {
-          if (Utils.isValidColor(e.target.value)) {
-            picker.querySelector("#custom-color").value = this.colorToHex(e.target.value);
-            this.updateColorSelection(colorGrid, e.target.value);
-          }
-        });
+    setupColorPickerEvents(picker, overlay, colorGrid, theme) {
+      // Enhanced event listeners for minimalist UI
+      picker.querySelector("#custom-color")?.addEventListener("change", (e) => {
+        picker.querySelector("#custom-color-text").value = e.target.value;
+        this.updateColorSelection(colorGrid, e.target.value, theme);
+      });
 
-        picker.querySelector("#apply-color")?.addEventListener("click", () => {
-          const selectedColor = picker.querySelector("#custom-color-text")?.value?.trim() ?? "";
-          if (selectedColor && Utils.isValidColor(selectedColor)) {
-            ConfigManager.set("COLOR", selectedColor);
-            StyleManager.updateStyles();
-            overlay.remove();
-            this.showNotification(`Color changed to: ${selectedColor}`, "success");
-          } else {
-            this.showNotification("Invalid color format. Please try again.", "error");
-          }
-        });
+      picker.querySelector("#custom-color-text")?.addEventListener("input", (e) => {
+        const input = e.target;
+        if (Utils.isValidColor(input.value)) {
+          picker.querySelector("#custom-color").value = this.colorToHex(input.value);
+          this.updateColorSelection(colorGrid, input.value, theme);
+          input.style.borderColor = theme.border;
+        } else {
+          input.style.borderColor = "#ef4444";
+        }
+      });
 
-        picker.querySelector("#cancel-color")?.addEventListener("click", () => overlay.remove());
-      };
+      // Focus styling
+      picker.querySelector("#custom-color-text")?.addEventListener("focus", (e) => {
+        e.target.style.borderColor = theme.accent;
+        e.target.style.boxShadow = `0 0 0 3px ${theme.accent}20`;
+      });
 
-      setupEventListeners();
+      picker.querySelector("#custom-color-text")?.addEventListener("blur", (e) => {
+        e.target.style.borderColor = theme.border;
+        e.target.style.boxShadow = "none";
+      });
 
+      // Button hover effects
+      const applyBtn = picker.querySelector("#apply-color");
+      const cancelBtn = picker.querySelector("#cancel-color");
+
+      applyBtn?.addEventListener("mouseenter", () => {
+        applyBtn.style.transform = "translateY(-1px)";
+        applyBtn.style.boxShadow = `0 4px 12px ${theme.accent}40`;
+      });
+
+      applyBtn?.addEventListener("mouseleave", () => {
+        applyBtn.style.transform = "translateY(0)";
+        applyBtn.style.boxShadow = "none";
+      });
+
+      cancelBtn?.addEventListener("mouseenter", () => {
+        cancelBtn.style.background = theme.border;
+      });
+
+      cancelBtn?.addEventListener("mouseleave", () => {
+        cancelBtn.style.background = theme.bgSecondary;
+      });
+
+      applyBtn?.addEventListener("click", () => {
+        const selectedColor = picker.querySelector("#custom-color-text")?.value?.trim() ?? "";
+        if (selectedColor && Utils.isValidColor(selectedColor)) {
+          ConfigManager.set("COLOR", selectedColor);
+          StyleManager.updateStyles();
+          overlay.remove();
+          this.showNotification(`Color: ${selectedColor}`, "success");
+        } else {
+          this.showNotification("Invalid color format", "error");
+        }
+      });
+
+      cancelBtn?.addEventListener("click", () => overlay.remove());
+      
+      // Close on overlay click
       overlay.addEventListener("click", (e) => {
         if (e.target === overlay) overlay.remove();
       });
 
-      overlay.appendChild(picker);
-      document.body.appendChild(overlay);
+      // Close on Escape key
+      const handleEscape = (e) => {
+        if (e.key === "Escape") {
+          overlay.remove();
+          document.removeEventListener("keydown", handleEscape);
+        }
+      };
+      document.addEventListener("keydown", handleEscape);
     },
 
     colorToHex(color) {
@@ -604,62 +839,89 @@
       return "#FF6B6B"; // fallback
     },
 
-    updateColorSelection(colorGrid, selectedColor) {
-      // ES2023 enhanced for...of loop
+    updateColorSelection(colorGrid, selectedColor, theme) {
+      // Update color selection with minimalist styling
       for (const btn of colorGrid.querySelectorAll("div")) {
         btn.style.border = "2px solid transparent";
         if (btn.title === selectedColor) {
-          btn.style.border = "2px solid #333";
+          btn.style.border = `2px solid ${theme.accent}`;
+          btn.style.boxShadow = `0 0 0 3px ${theme.accent}20`;
         }
       }
     },
 
     showNotification(message, type = "info") {
-      // Check if floating menu button exists with ES2023 optional chaining
+      // Minimalist notification system
+      const currentTheme = Utils.getCurrentTheme();
+      const theme = CONFIG.THEMES[currentTheme];
+      const isCompact = ConfigManager.get("UI_COMPACT");
+      
       const hasFloatingButton = document.getElementById("visited-links-menu-button");
-      const rightPosition = hasFloatingButton ? "80px" : "20px";
+      const rightPosition = hasFloatingButton ? (isCompact ? "52px" : "70px") : (isCompact ? "12px" : "20px");
       
       const notification = document.createElement("div");
       
-      // Simplified notification styling - fix for ES2023 compatibility
-      const bgColor = type === "success" ? "#4CAF50" : type === "error" ? "#f44336" : "#2196F3";
+      // Minimalist notification colors
+      const colors = {
+        success: theme.accent,
+        error: "#ef4444",
+        info: theme.textSecondary,
+      };
       
       notification.style.cssText = `
         position: fixed !important;
-        top: 20px !important;
+        top: ${isCompact ? '12px' : '20px'} !important;
         right: ${rightPosition} !important;
-        padding: 15px 20px !important;
-        border-radius: 5px !important;
-        color: white !important;
-        font-family: Arial, sans-serif !important;
-        font-size: 14px !important;
+        padding: ${isCompact ? '8px 12px' : '12px 16px'} !important;
+        border-radius: ${isCompact ? '6px' : '8px'} !important;
+        color: ${theme.text} !important;
+        background: ${theme.bg} !important;
+        border: 1px solid ${theme.border} !important;
+        font-family: system-ui, -apple-system, sans-serif !important;
+        font-size: ${isCompact ? '12px' : '13px'} !important;
+        font-weight: 500 !important;
         z-index: 2147483647 !important;
         opacity: 0 !important;
-        transition: opacity 0.3s ease !important;
+        transform: translateY(-10px) !important;
+        transition: all 0.2s ease !important;
         display: flex !important;
         align-items: center !important;
-        justify-content: center !important;
-        min-height: 20px !important;
-        line-height: 1.4 !important;
+        gap: ${isCompact ? '6px' : '8px'} !important;
+        min-height: ${isCompact ? '16px' : '20px'} !important;
+        line-height: 1.3 !important;
         pointer-events: none !important;
-        background: ${bgColor} !important;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
+        box-shadow: ${theme.shadow} !important;
+        backdrop-filter: blur(10px) !important;
+        border-left: 3px solid ${colors[type]} !important;
       `;
 
-      notification.textContent = message;
+      // Add icon based on type
+      const icons = {
+        success: "✓",
+        error: "✕",
+        info: "●",
+      };
+
+      notification.innerHTML = `
+        <span style="color: ${colors[type]}; font-size: ${isCompact ? '10px' : '12px'};">
+          ${icons[type]}
+        </span>
+        <span>${message}</span>
+      `;
+
       document.body.appendChild(notification);
 
-      // Show notification with requestAnimationFrame for better compatibility
+      // Show notification with smooth animation
       requestAnimationFrame(() => {
         notification.style.setProperty("opacity", "1", "important");
+        notification.style.setProperty("transform", "translateY(0)", "important");
       });
 
       // Auto remove notification
       setTimeout(() => {
         notification.style.setProperty("opacity", "0", "important");
-        setTimeout(() => {
-          notification.remove();
-        }, 300);
+        notification.style.setProperty("transform", "translateY(-10px)", "important");
+        setTimeout(() => notification.remove(), 200);
       }, 3000);
     },
 
@@ -685,8 +947,11 @@
       ConfigManager.set("COLOR", CONFIG.DEFAULTS.COLOR);
       ConfigManager.set("EXCEPT_SITES", CONFIG.DEFAULTS.EXCEPT_SITES);
       ConfigManager.set("ENABLED", CONFIG.DEFAULTS.ENABLED);
+      ConfigManager.set("THEME_MODE", CONFIG.DEFAULTS.THEME_MODE);
+      ConfigManager.set("UI_COMPACT", CONFIG.DEFAULTS.UI_COMPACT);
       StyleManager.updateStyles();
-      this.showNotification("Settings reset to defaults", "success");
+      this.updateFloatingMenuTheme();
+      this.showNotification("Settings reset", "success");
     },
   };
 
@@ -766,22 +1031,22 @@
   }
 })();
 
-// Enhanced Features Added - ES2023 Version:
-// 1. ES2023 syntax: Object.freeze, queueMicrotask, enhanced optional chaining
-// 2. Modern array methods: at(), findLast(), toReversed() with fallbacks
-// 3. Enhanced error handling with try-catch expressions
-// 4. Immutable data structures with Object.freeze
-// 5. Performance optimizations with queueMicrotask
-// 6. Enhanced string processing with replaceAll
-// 7. Modern event handling with addEventListener
-// 8. Structured object assignment and destructuring
-// 9. Enhanced template literals and string interpolation
-// 10. Backward compatibility maintained for all features
-// 11. ES2023 enhanced DOM manipulation methods
-// 12. Modern async patterns with microtasks
-// 13. Enhanced null safety with ?? operators
-// 14. Improved code modularity and immutability
-// 15. Cross-platform compatibility preserved
-// 16. ScriptCat/Tampermonkey compatibility maintained
-// 17. Performance improvements through modern JS features
-// 18. Enhanced error boundaries and graceful degradation
+// Enhanced Features Added - ES2023 Minimalist UI Version:
+// 1. Minimalist dark/light theme system with auto-detection
+// 2. Compact UI mode for space-conscious users
+// 3. Modern gradient color palette with accessibility focus
+// 4. Glassmorphism effects with backdrop-filter
+// 5. Smooth micro-interactions and hover effects
+// 6. Clean typography using system fonts
+// 7. Reduced visual clutter with essential-only elements
+// 8. Theme toggle functionality
+// 9. Enhanced notification system with icons
+// 10. Responsive design for different screen sizes
+// 11. Improved focus states for accessibility
+// 12. Subtle animations and transitions
+// 13. Modern button and input styling
+// 14. Clean color picker with better UX
+// 15. Minimalist floating menu design
+// 16. ES2023 syntax with Object.freeze and enhanced methods
+// 17. Backward compatibility maintained
+// 18. Cross-platform theme detection
