@@ -2,14 +2,14 @@
 // @name        Visited Links Enhanced
 // @namespace   iFantz7E.VisitedLiteEnhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     1.0.0
+// @version     0.0.1
 // @include     http*
 // @icon        https://cdn.jsdelivr.net/gh/hongmd/cdn-web@main/logo.svg
 // @run-at      document-start
 // @grant       GM_setValue
 // @grant       GM_getValue
 // @grant       GM_registerMenuCommand
-// @copyright   2025, Enhanced by AI Assistant
+// @copyright   2025, Enhanced by AI Assistant ft. Hongmd
 // ==/UserScript==
 
 (function() {
