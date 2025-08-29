@@ -1,23 +1,21 @@
 // ==UserScript==
-// @name        Visited Links Enhanced
-// @namespace   com.userscript.visited-links-enhanced
-// @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.2.6
-// @include     http*
-// @include     https*
-// @match       http://*/*
-// @match       https://*/*
+// @name         Visited Links Enhanced
+// @namespace    com.userscript.visited-links-enhanced
+// @description  Enhanced userscript to mark visited links with custom colors and improved performance
+// @version      0.2.6
+// @match        http://*/*
+// @match        https://*/*
 // @noframes
-// @icon        https://cdn.jsdelivr.net/gh/hongmd/cdn-web@main/logo.svg
-// @run-at      document-start
-// @grant       GM_setValue
-// @grant       GM_getValue
-// @grant       GM_registerMenuCommand
-// @grant       GM_info
-// @compatible  ScriptCat
-// @compatible  Tampermonkey
-// @compatible  Greasemonkey
-// @copyright   2025, Enhanced by AI Assistant ft. Hongmd
+// @icon         https://cdn.jsdelivr.net/gh/hongmd/cdn-web@main/logo.svg
+// @run-at       document-start
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_registerMenuCommand
+// @grant        GM_info
+// @compatible   ScriptCat
+// @compatible   Tampermonkey
+// @compatible   Greasemonkey
+// @copyright    2025, Enhanced by AI Assistant ft. Hongmd
 // ==/UserScript==
 
 (function () {
@@ -136,13 +134,6 @@
     sanitizeInput(input) {
       return input.replace(/[<>'"]/g, "");
     },
-
-    // Normalize site string (remove protocol/www, lowercase, trim)
-    normalizeSite(input) {
-      if (!input) return "";
-      var s = String(input).trim().toLowerCase();
-      return s.replace(/^(https?:\/\/)?(www\.)?/, "");
-    },
   };
 
   //// Configuration Manager with ScriptCat Compatibility
@@ -229,7 +220,6 @@
   //// Style Manager
   const StyleManager = {
     styleElement: null,
-    _lastAppliedColor: null,
 
     init() {
       this.createStyleElement();
@@ -262,11 +252,8 @@
 
       const color = ConfigManager.get("COLOR");
       if (Utils.isValidColor(color)) {
-        if (color !== this._lastAppliedColor) {
-          const css = CONFIG.CSS_TEMPLATE.replace(/%COLOR%/g, color);
-          this.styleElement.textContent = css;
-          this._lastAppliedColor = color;
-        }
+        const css = CONFIG.CSS_TEMPLATE.replace(/%COLOR%/g, color);
+        this.styleElement.textContent = css;
       }
     },
 
@@ -702,17 +689,8 @@
       );
 
       if (newExceptions !== null) {
-        var sanitized = Utils.sanitizeInput(newExceptions ? newExceptions.trim() : "");
-        // normalize, split, unique, and serialize
-        var items = sanitized.split(",").map(function(s){ return Utils.normalizeSite(s); }).filter(function(s){ return s.length > 0; });
-        var seen = Object.create(null);
-        var unique = [];
-        for (var i = 0; i < items.length; i++) {
-          var it = items[i];
-          if (!seen[it]) { seen[it] = true; unique.push(it); }
-        }
-        var serialized = unique.join(",");
-        ConfigManager.set("EXCEPT_SITES", serialized);
+        const sanitizedExceptions = Utils.sanitizeInput(newExceptions ? newExceptions.trim() : "");
+        ConfigManager.set("EXCEPT_SITES", sanitizedExceptions);
         this.showNotification("Exception sites updated!", "success");
 
         // Reapply styles based on new exceptions
