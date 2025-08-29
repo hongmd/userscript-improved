@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist flat UI userscript for visited links customization
-// @version      0.5.8
+// @version      0.5.9
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -119,54 +119,79 @@
     { color: "#eab308", name: "Pure Yellow", desc: "Primary, bright" },
   ]);
 
-  //// Utility Functions - ES2023 Enhanced
+  //// Utility Functions - ES2023 Enhanced & Performance Optimized
   const Utils = Object.freeze({
-    // Debounce function with ES2023 syntax
-    debounce: (func, wait) => {
+    // Optimized debounce with immediate execution option
+    debounce: (func, wait, immediate = false) => {
       let timeout;
       return (...args) => {
         const later = () => {
-          clearTimeout(timeout);
-          func(...args);
+          timeout = null;
+          if (!immediate) func(...args);
         };
+        const callNow = immediate && !timeout;
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
+        if (callNow) func(...args);
       };
     },
 
-    // Validate color format with enhanced error handling
+    // Cached color validation for performance
+    _colorCache: new Map(),
     isValidColor: (color) => {
+      if (Utils._colorCache.has(color)) {
+        return Utils._colorCache.get(color);
+      }
+      
       try {
         const testElement = new Option();
         testElement.style.color = color;
-        return testElement.style.color !== "";
+        const isValid = testElement.style.color !== "";
+        
+        // Cache result with size limit
+        if (Utils._colorCache.size > 100) {
+          const firstKey = Utils._colorCache.keys().next().value;
+          Utils._colorCache.delete(firstKey);
+        }
+        Utils._colorCache.set(color, isValid);
+        return isValid;
       } catch {
+        Utils._colorCache.set(color, false);
         return false;
       }
     },
 
-    // Get domain from URL with ES2023 features
+    // Optimized domain extraction with caching
+    _domainExtractionCache: new Map(),
     getDomain: (url) => {
-      try {
-        return new URL(url).hostname;
-      } catch {
-        // Fallback for malformed URLs using structured binding
-        try {
-          const anchor = Object.assign(document.createElement("a"), { href: url });
-          return anchor.hostname || "";
-        } catch {
-          return "";
-        }
+      if (Utils._domainExtractionCache.has(url)) {
+        return Utils._domainExtractionCache.get(url);
       }
+      
+      let domain = "";
+      try {
+        domain = new URL(url).hostname;
+      } catch {
+        // Faster fallback without DOM creation
+        const match = url.match(/^https?:\/\/([^\/\?#]+)/i);
+        domain = match ? match[1] : "";
+      }
+      
+      // Cache with size limit
+      if (Utils._domainExtractionCache.size > 200) {
+        Utils._domainExtractionCache.clear();
+      }
+      Utils._domainExtractionCache.set(url, domain);
+      return domain;
     },
 
-    // Sanitize input with enhanced regex and ES2023 array methods
+    // Ultra-fast input sanitization
     sanitizeInput: (input) => {
-      const dangerousChars = ["<", ">", "'", '"'];
-      return dangerousChars.reduce((acc, char) => acc.replaceAll(char, ""), input);
+      // Pre-compiled regex for better performance
+      return input?.replace(/[<>"']/g, "") ?? "";
     },
 
-    // ES2023 Array helper methods with fallbacks
+    // ES2023 Array helper methods with fallbacks (unchanged for compatibility)
     arrayAt: (array, index) => {
       return ENVIRONMENT.supportsArrayAt ? array.at(index) : array[index < 0 ? array.length + index : index];
     },
@@ -175,7 +200,7 @@
       if (ENVIRONMENT.supportsFindLast) {
         return array.findLast(predicate);
       }
-      // Fallback implementation
+      // Optimized fallback
       for (let i = array.length - 1; i >= 0; i--) {
         if (predicate(array[i], i, array)) {
           return array[i];
@@ -184,9 +209,13 @@
       return undefined;
     },
 
-    // Get current theme based on settings
-    getCurrentTheme: () => {
-      return "light"; // Always use light theme for flat UI
+    // Always return light theme (no computation needed)
+    getCurrentTheme: () => "light",
+    
+    // Clear all utility caches
+    clearCaches: () => {
+      Utils._colorCache.clear();
+      Utils._domainExtractionCache.clear();
     },
   });
 
@@ -306,12 +335,15 @@
     clearCache() {
       this._cache.clear();
       this._domainCache.clear();
+      // Also clear utility caches
+      Utils.clearCaches();
     },
   };
 
-  //// Style Manager
+  //// Style Manager - Memory & DOM Optimized
   const StyleManager = {
     styleElement: null,
+    _lastCSS: "", // Cache to avoid unnecessary DOM updates
 
     init() {
       this.createStyleElement();
@@ -326,30 +358,37 @@
         type: "text/css"
       });
 
-      // Try to append to head with ES2023 optional chaining
-      const target = document.head ?? document.documentElement ?? document.body ?? document;
+      // Optimized insertion with priority order
+      const target = document.head ?? document.documentElement;
       target?.appendChild?.(this.styleElement);
 
       return this.styleElement;
     },
 
     updateStyles() {
-      // Ensure style element exists and is attached
+      const color = ConfigManager.get("COLOR");
+      if (!Utils.isValidColor(color)) return;
+
+      // Generate CSS only if color changed
+      const css = CONFIG.CSS_TEMPLATE.replaceAll("%COLOR%", color);
+      
+      // Skip DOM update if CSS hasn't changed
+      if (this._lastCSS === css) return;
+      
+      // Ensure style element exists
       if (!this.styleElement?.isConnected) {
         this.createStyleElement();
       }
 
-      const color = ConfigManager.get("COLOR");
-      if (Utils.isValidColor(color)) {
-        // ES2023 replaceAll instead of regex replace
-        const css = CONFIG.CSS_TEMPLATE.replaceAll("%COLOR%", color);
-        this.styleElement.textContent = css;
-      }
+      // Update DOM only when necessary
+      this.styleElement.textContent = css;
+      this._lastCSS = css;
     },
 
     removeStyles() {
-      if (this.styleElement) {
+      if (this.styleElement && this._lastCSS) {
         this.styleElement.textContent = "";
+        this._lastCSS = "";
       }
     },
   };
@@ -395,44 +434,48 @@
     },
 
     createSimpleColorPicker() {
-      // Performance optimized color picker
+      // Ultra-optimized color picker with pre-computed strings
       const currentColor = ConfigManager.get("COLOR");
       
-      // Pre-build color options string for better memory usage
-      const colorOptions = COLOR_PALETTE.map((item, index) => 
-        `${index + 1}. ${item.name} - ${item.desc} (${item.color})`
-      ).join('\n');
+      // Lazy-build color options only when needed
+      if (!this._cachedColorOptions) {
+        this._cachedColorOptions = COLOR_PALETTE.map((item, index) => 
+          `${index + 1}. ${item.name} - ${item.desc} (${item.color})`
+        ).join('\n');
+      }
       
       const choice = prompt(
-        `🎨 Choose a color for visited links:\n\n${colorOptions}\n\nEnter number (1-${COLOR_PALETTE.length}) or custom color code:`,
+        `🎨 Choose a color for visited links:\n\n${this._cachedColorOptions}\n\nEnter number (1-${COLOR_PALETTE.length}) or custom color code:`,
         currentColor
       );
 
-      if (choice !== null) {
-        let selectedColor;
-        const trimmedChoice = choice.trim();
-        
-        // Optimized number parsing
-        const num = parseInt(trimmedChoice, 10);
-        if (num >= 1 && num <= COLOR_PALETTE.length && !isNaN(num)) {
-          selectedColor = COLOR_PALETTE[num - 1].color;
-        } else if (Utils.isValidColor(trimmedChoice)) {
-          selectedColor = trimmedChoice;
-        } else {
-          alert("Invalid color format. Please try again.");
-          return;
-        }
+      if (choice === null) return;
 
-        ConfigManager.set("COLOR", selectedColor);
-        StyleManager.updateStyles();
-        
-        // Optimized color info lookup
-        const colorItem = COLOR_PALETTE.find(item => item.color === selectedColor);
-        const colorInfo = colorItem 
-          ? `${colorItem.name} - ${colorItem.desc}`
-          : "Custom Color";
-        alert(`✅ Color changed to: ${colorInfo} (${selectedColor})`);
+      const trimmedChoice = choice.trim();
+      if (!trimmedChoice) return;
+      
+      let selectedColor;
+      
+      // Fast number parsing with validation
+      const num = parseInt(trimmedChoice, 10);
+      if (num >= 1 && num <= COLOR_PALETTE.length && trimmedChoice === num.toString()) {
+        selectedColor = COLOR_PALETTE[num - 1].color;
+      } else if (Utils.isValidColor(trimmedChoice)) {
+        selectedColor = trimmedChoice;
+      } else {
+        alert("Invalid color format. Please try again.");
+        return;
       }
+
+      ConfigManager.set("COLOR", selectedColor);
+      StyleManager.updateStyles();
+      
+      // Fast lookup with early return
+      const colorItem = COLOR_PALETTE.find(item => item.color === selectedColor);
+      const colorInfo = colorItem 
+        ? `${colorItem.name} - ${colorItem.desc}`
+        : "Custom Color";
+      alert(`✅ Color changed to: ${colorInfo} (${selectedColor})`);
     },
 
     manageExceptions() {
@@ -494,61 +537,64 @@
     },
 
     observeChanges() {
-      // Optimized debounced function with configurable delay
+      // Ultra-optimized debounced function with immediate flag
       const debouncedUpdate = Utils.debounce(() => {
         this.checkAndApplyStyles();
       }, CONFIG.DEBOUNCE_DELAY);
 
-      // Optimized MutationObserver with performance limits
+      // Highly optimized MutationObserver
       if (window.MutationObserver) {
         const observer = new MutationObserver((mutations) => {
-          // Only process if mutations are relevant and within limits
-          let relevantChanges = false;
+          // Fast-path: Early exit if no mutations
+          if (!mutations.length) return;
+          
+          let hasRelevantChanges = false;
           let nodeCount = 0;
           
+          // Optimized loop with early breaks
           for (const mutation of mutations) {
-            nodeCount += mutation.addedNodes.length;
+            const addedNodesLength = mutation.addedNodes.length;
+            if (!addedNodesLength) continue;
             
-            // Stop if too many nodes to prevent performance issues
+            nodeCount += addedNodesLength;
+            
+            // Performance circuit breaker
             if (nodeCount > CONFIG.MAX_OBSERVER_NODES) {
-              relevantChanges = true;
+              hasRelevantChanges = true;
               break;
             }
             
-            // Check if any added nodes contain links
+            // Fast link detection
             for (const node of mutation.addedNodes) {
-              if (node.nodeType === Node.ELEMENT_NODE) {
-                if (node.tagName === 'A' || node.querySelector?.('a')) {
-                  relevantChanges = true;
+              if (node.nodeType === 1) { // ELEMENT_NODE constant
+                const tagName = node.tagName;
+                if (tagName === 'A' || (tagName && node.querySelector && node.querySelector('a'))) {
+                  hasRelevantChanges = true;
                   break;
                 }
               }
             }
             
-            if (relevantChanges) break;
+            if (hasRelevantChanges) break;
           }
           
-          // Only update if relevant changes detected
-          if (relevantChanges) {
+          // Execute update only for relevant changes
+          if (hasRelevantChanges) {
             debouncedUpdate();
           }
         });
 
-        // Observe with minimal scope for better performance
+        // Minimal observer configuration for maximum performance
         observer.observe(document.documentElement, {
           childList: true,
           subtree: true,
-          // Removed unnecessary options for performance
-          attributes: false,
-          attributeOldValue: false,
-          characterData: false,
-          characterDataOldValue: false,
         });
       }
 
-      // Optimized event listeners with passive option
-      window.addEventListener("popstate", debouncedUpdate, { passive: true });
-      window.addEventListener("hashchange", debouncedUpdate, { passive: true });
+      // Passive event listeners for navigation changes
+      const passiveOptions = { passive: true };
+      window.addEventListener("popstate", debouncedUpdate, passiveOptions);
+      window.addEventListener("hashchange", debouncedUpdate, passiveOptions);
     },
   };
 
@@ -579,15 +625,18 @@
   }
 })();
 
-// Performance & Memory Optimized Features:
+// Ultra-Performance & Memory Optimized Features:
 // 1. Simple built-in menu system only (no floating UI)
-// 2. Prompt-based color picker for simplicity  
+// 2. Prompt-based color picker with lazy loading
 // 3. Alert-based notifications
 // 4. No CSS animations or effects
-// 5. Memory caching for faster access
-// 6. Optimized MutationObserver with limits
-// 7. Debounced updates for better performance
-// 8. Memoized domain checking
-// 9. Passive event listeners
-// 10. Cross-platform compatibility
-// 11. Lightweight and ultra-fast performance
+// 5. Multi-level caching system (config, domain, color, CSS)
+// 6. Optimized MutationObserver with smart filtering
+// 7. Debounced updates with immediate execution option
+// 8. Memoized domain checking with size limits
+// 9. Passive event listeners for better performance
+// 10. Regex optimization and pre-compilation
+// 11. Fast-path optimizations and early returns
+// 12. DOM update minimization with change detection
+// 13. Cross-platform compatibility
+// 14. Ultra-lightweight and blazing-fast performance
