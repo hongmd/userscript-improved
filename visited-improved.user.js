@@ -2,7 +2,7 @@
 // @name        Visited Links Enhanced
 // @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.1.1
+// @version     0.1.2
 // @include     http*
 // @include     https*
 // @match       http://*/*
@@ -124,7 +124,7 @@
 
     // Sanitize input
     sanitizeInput(input) {
-      return input.replaceAll(/[<>'"]/g, "");
+      return input.replace(/[<>'"]/g, "");
     },
   };
 
@@ -242,8 +242,9 @@
     },
 
     removeStyles() {
-      this.styleElement &&= null;
-      this.styleElement?.textContent &&= "";
+      if (this.styleElement) {
+        this.styleElement.textContent = "";
+      }
     },
   };
 
@@ -318,7 +319,11 @@
 
       // Add to page when DOM is ready
       const addMenu = () => {
-        document.body?.appendChild(menuButton) ?? setTimeout(addMenu, 100);
+        if (document.body) {
+          document.body.appendChild(menuButton);
+        } else {
+          setTimeout(addMenu, 100);
+        }
       };
       addMenu();
     },
