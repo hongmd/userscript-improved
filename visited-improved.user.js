@@ -2,7 +2,7 @@
 // @name        Visited Links Enhanced
 // @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.2.2
+// @version     0.2.3
 // @include     http*
 // @include     https*
 // @match       http://*/*
@@ -613,30 +613,31 @@
       
       const notification = document.createElement("div");
       notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: ${rightPosition};
-                padding: 15px 20px;
-                border-radius: 5px;
-                color: white;
-                font-family: Arial, sans-serif;
-                font-size: 14px;
-                z-index: 1_000_000;
-                opacity: 0;
-                transition: opacity 0.3s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 20px;
-                line-height: 1.4;
+                position: fixed !important;
+                top: 20px !important;
+                right: ${rightPosition} !important;
+                padding: 15px 20px !important;
+                border-radius: 5px !important;
+                color: white !important;
+                font-family: Arial, sans-serif !important;
+                font-size: 14px !important;
+                z-index: 2147483647 !important;
+                opacity: 0 !important;
+                transition: opacity 0.3s ease !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                min-height: 20px !important;
+                line-height: 1.4 !important;
+                pointer-events: none !important;
                 background: ${
                   type === "success"
                     ? "#4CAF50"
                     : type === "error"
                     ? "#f44336"
                     : "#2196F3"
-                };
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+                } !important;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
             `;
 
       notification.textContent = message;
@@ -644,12 +645,12 @@
 
       // Fade in
       setTimeout(() => {
-        notification.style.opacity = "1";
+        notification.style.setProperty("opacity", "1", "important");
       }, 10);
 
       // Auto remove
       setTimeout(() => {
-        notification.style.opacity = "0";
+        notification.style.setProperty("opacity", "0", "important");
         setTimeout(() => {
           notification.parentNode?.removeChild(notification);
         }, 300);
