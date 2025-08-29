@@ -69,7 +69,7 @@
       UI_COMPACT: "ui_compact", // New: compact mode
     }),
     DEFAULTS: Object.freeze({
-      COLOR: "#6366f1", // Modern indigo color
+      COLOR: "#f97316", // Modern orange color
       EXCEPT_SITES: "mail.live.com,gmail.com",
       ENABLED: true,
       THEME_MODE: "auto", // auto, light, dark
