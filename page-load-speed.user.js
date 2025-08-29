@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Page Load Speed Monitor
 // @namespace    com.userscript.page-load-speed
-// @description  Ultra-lightweight page load speed monitor with dark transparent UI, auto-hide, and performance metrics info - minimal CPU/RAM impact
-// @version      1.6.0
+// @description  Ultra-lightweight page load speed monitor with minimal UI - maximum performance, zero animations
+// @version      1.7.0
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -38,7 +38,7 @@
       setTimeout(() => lcpObserver.disconnect(), 8000);
     }
   } catch (e) {
-    console.log('LCP not supported');
+    // LCP not supported
   }
   
   // ===== TẠO CSS =====
@@ -53,60 +53,42 @@
         position: fixed;
         top: 10px;
         right: 10px;
-        background: rgba(0, 0, 0, 0.85);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        color: #ffffff;
-        padding: 12px 16px;
-        border-radius: 12px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        font-size: 13px;
-        font-weight: 500;
-        z-index: 9999999;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        cursor: pointer;
-        transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-        user-select: none;
-        opacity: 0.9;
-      }
-      #speed-box:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-        opacity: 1;
         background: rgba(0, 0, 0, 0.9);
+        color: #ffffff;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 9999999;
+        border: 1px solid #333;
+        cursor: pointer;
+        user-select: none;
       }
       #speed-box.expanded {
-        min-width: 280px;
-        padding: 16px 20px;
+        min-width: 240px;
+        padding: 12px 16px;
       }
       #close-btn {
         float: right;
-        margin-left: 12px;
+        margin-left: 8px;
         cursor: pointer;
         font-weight: bold;
-        opacity: 0.7;
-        transition: opacity 0.2s ease;
-      }
-      #close-btn:hover {
-        opacity: 1;
         color: #ff6b6b;
       }
       #info-btn {
         float: right;
-        margin-left: 8px;
+        margin-left: 6px;
         cursor: pointer;
-        opacity: 0.7;
-        transition: opacity 0.2s ease;
+        opacity: 0.8;
       }
       #info-btn:hover {
         opacity: 1 !important;
       }
       #details {
         display: none;
-        margin-top: 12px;
+        margin-top: 8px;
         font-size: 11px;
-        opacity: 0.9;
       }
       #details.show {
         display: block;
@@ -114,27 +96,22 @@
       .metric {
         display: flex;
         justify-content: space-between;
-        margin: 6px 0;
-        padding: 2px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      }
-      .metric:last-child {
-        border-bottom: none;
+        margin: 4px 0;
       }
       .good { color: #4ade80; }
       .medium { color: #fbbf24; }
       .poor { color: #f87171; }
       .metric-label {
-        opacity: 0.8;
+        opacity: 0.9;
       }
       #info-panel {
         display: none;
-        margin-top: 12px;
-        padding: 8px;
+        margin-top: 8px;
+        padding: 6px;
         background: rgba(255,255,255,0.1);
-        border-radius: 6px;
+        border-radius: 4px;
         font-size: 10px;
-        line-height: 1.4;
+        line-height: 1.3;
       }
     `;
     
@@ -260,14 +237,6 @@
     document.body.appendChild(box);
     isUICreated = true;
     
-    // Hiệu ứng fade-in
-    box.style.opacity = '0';
-    box.style.transform = 'translateY(-10px)';
-    setTimeout(() => {
-      box.style.opacity = '0.9';
-      box.style.transform = 'translateY(0)';
-    }, 100);
-    
     // Bắt đầu tự động tắt
     startAutoHide();
     
@@ -319,7 +288,6 @@
   
   // ===== LẤY SỐ LIỆU HIỆU SUẤT =====
   function getPageTimings() {
-    // Khởi tạo kết quả
     const result = {
       loadTime: 0,
       dcl: 0,
@@ -370,7 +338,6 @@
   }
   
   // ===== KHỞI TẠO =====
-  // CSS trước
   injectStyles();
   
   // Tạo UI khi DOM sẵn sàng
@@ -439,17 +406,7 @@
       const box = document.getElementById('speed-box');
       if (box) {
         clearInterval(countdownInterval);
-        box.style.opacity = '0.3';
-        box.style.transform = 'translateY(-2px) scale(0.95)';
-        
-        // Tự động xóa sau 2 giây nữa
-        setTimeout(() => {
-          if (box && box.parentNode) {
-            box.style.opacity = '0';
-            box.style.transform = 'translateY(-10px) scale(0.9)';
-            setTimeout(() => box.remove(), 300);
-          }
-        }, 2000);
+        box.remove();
       }
     }, 10000); // 10 giây
   }
