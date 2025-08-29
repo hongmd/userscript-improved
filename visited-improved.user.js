@@ -24,26 +24,36 @@
 
   // ScriptCat & Browser Compatibility Detection
   const ENVIRONMENT = {
-    isScriptCat: typeof GM_info !== 'undefined' && GM_info.scriptHandler === 'ScriptCat',
-    isFirefox: navigator.userAgent.toLowerCase().includes('firefox'),
-    isTampermonkey: typeof GM_info !== 'undefined' && GM_info.scriptHandler === 'Tampermonkey',
-    isGreasemonkey: typeof GM_info !== 'undefined' && GM_info.scriptHandler === 'Greasemonkey',
-    
+    isScriptCat:
+      typeof GM_info !== "undefined" && GM_info.scriptHandler === "ScriptCat",
+    isFirefox: navigator.userAgent.toLowerCase().includes("firefox"),
+    isTampermonkey:
+      typeof GM_info !== "undefined" &&
+      GM_info.scriptHandler === "Tampermonkey",
+    isGreasemonkey:
+      typeof GM_info !== "undefined" &&
+      GM_info.scriptHandler === "Greasemonkey",
+
     // Feature detection
-    hasStorage: typeof GM_setValue !== 'undefined' && typeof GM_getValue !== 'undefined',
-    hasMenuCommand: typeof GM_registerMenuCommand !== 'undefined'
+    hasStorage:
+      typeof GM_setValue !== "undefined" && typeof GM_getValue !== "undefined",
+    hasMenuCommand: typeof GM_registerMenuCommand !== "undefined",
   };
 
   // Compatibility logging
-  console.log('[Visited Links Enhanced] Environment detected:', {
-    handler: ENVIRONMENT.isScriptCat ? 'ScriptCat' : 
-             ENVIRONMENT.isTampermonkey ? 'Tampermonkey' : 
-             ENVIRONMENT.isGreasemonkey ? 'Greasemonkey' : 'Unknown',
-    browser: ENVIRONMENT.isFirefox ? 'Firefox' : 'Other',
+  console.log("[Visited Links Enhanced] Environment detected:", {
+    handler: ENVIRONMENT.isScriptCat
+      ? "ScriptCat"
+      : ENVIRONMENT.isTampermonkey
+      ? "Tampermonkey"
+      : ENVIRONMENT.isGreasemonkey
+      ? "Greasemonkey"
+      : "Unknown",
+    browser: ENVIRONMENT.isFirefox ? "Firefox" : "Other",
     features: {
       storage: ENVIRONMENT.hasStorage,
-      menuCommand: ENVIRONMENT.hasMenuCommand
-    }
+      menuCommand: ENVIRONMENT.hasMenuCommand,
+    },
   });
 
   //// Enhanced Configuration with Storage
@@ -127,50 +137,59 @@
   //// Configuration Manager with ScriptCat Compatibility
   const ConfigManager = {
     // Storage fallback system
-    _storagePrefix: 'visited_links_enhanced_',
-    
+    _storagePrefix: "visited_links_enhanced_",
+
     get(key) {
       const storageKey = CONFIG.STORAGE_KEYS[key];
       const defaultValue = CONFIG.DEFAULTS[key];
-      
+
       // Try GM_getValue first (ScriptCat/Tampermonkey)
       if (ENVIRONMENT.hasStorage) {
         try {
           return GM_getValue(storageKey, defaultValue);
         } catch (e) {
-          console.warn('[ScriptCat Compatibility] GM_getValue failed, trying localStorage:', e);
+          console.warn(
+            "[ScriptCat Compatibility] GM_getValue failed, trying localStorage:",
+            e
+          );
         }
       }
-      
+
       // Fallback to localStorage for ScriptCat compatibility
       try {
         const stored = localStorage.getItem(this._storagePrefix + storageKey);
         return stored !== null ? JSON.parse(stored) : defaultValue;
       } catch (e) {
-        console.warn('[Storage] Both GM and localStorage failed:', e);
+        console.warn("[Storage] Both GM and localStorage failed:", e);
         return defaultValue;
       }
     },
 
     set(key, value) {
       const storageKey = CONFIG.STORAGE_KEYS[key];
-      
+
       // Try GM_setValue first
       if (ENVIRONMENT.hasStorage) {
         try {
           GM_setValue(storageKey, value);
           return true;
         } catch (e) {
-          console.warn('[ScriptCat Compatibility] GM_setValue failed, trying localStorage:', e);
+          console.warn(
+            "[ScriptCat Compatibility] GM_setValue failed, trying localStorage:",
+            e
+          );
         }
       }
-      
+
       // Fallback to localStorage
       try {
-        localStorage.setItem(this._storagePrefix + storageKey, JSON.stringify(value));
+        localStorage.setItem(
+          this._storagePrefix + storageKey,
+          JSON.stringify(value)
+        );
         return true;
       } catch (e) {
-        console.warn('[Storage] Both GM and localStorage failed:', e);
+        console.warn("[Storage] Both GM and localStorage failed:", e);
         return false;
       }
     },
@@ -246,17 +265,28 @@
       // Try to register menu commands (ScriptCat/Tampermonkey support)
       if (ENVIRONMENT.hasMenuCommand) {
         try {
-          GM_registerMenuCommand("🎨 Change Color", this.changeColor.bind(this));
-          GM_registerMenuCommand("⚙️ Toggle Visited Links", this.toggleScript.bind(this));
-          GM_registerMenuCommand("🚫 Manage Exception Sites", this.manageExceptions.bind(this));
-          
-          console.log('[ScriptCat] Menu commands registered successfully');
+          GM_registerMenuCommand(
+            "🎨 Change Color",
+            this.changeColor.bind(this)
+          );
+          GM_registerMenuCommand(
+            "⚙️ Toggle Visited Links",
+            this.toggleScript.bind(this)
+          );
+          GM_registerMenuCommand(
+            "🚫 Manage Exception Sites",
+            this.manageExceptions.bind(this)
+          );
+
+          console.log("[ScriptCat] Menu commands registered successfully");
         } catch (e) {
-          console.warn('[ScriptCat] Menu registration failed:', e);
+          console.warn("[ScriptCat] Menu registration failed:", e);
           this.createFloatingMenu();
         }
       } else {
-        console.log('[ScriptCat] GM_registerMenuCommand not available, creating floating menu');
+        console.log(
+          "[ScriptCat] GM_registerMenuCommand not available, creating floating menu"
+        );
         this.createFloatingMenu();
       }
     },
@@ -264,9 +294,9 @@
     // Fallback floating menu for when GM_registerMenuCommand is not available
     createFloatingMenu() {
       // Create floating menu button
-      const menuButton = document.createElement('div');
-      menuButton.id = 'visited-links-menu-button';
-      menuButton.innerHTML = '🎨';
+      const menuButton = document.createElement("div");
+      menuButton.id = "visited-links-menu-button";
+      menuButton.innerHTML = "🎨";
       menuButton.style.cssText = `
         position: fixed;
         top: 20px;
@@ -285,19 +315,19 @@
         transition: all 0.3s ease;
         opacity: 0.8;
       `;
-      
+
       menuButton.onmouseenter = () => {
-        menuButton.style.opacity = '1';
-        menuButton.style.transform = 'scale(1.1)';
+        menuButton.style.opacity = "1";
+        menuButton.style.transform = "scale(1.1)";
       };
-      
+
       menuButton.onmouseleave = () => {
-        menuButton.style.opacity = '0.8';
-        menuButton.style.transform = 'scale(1)';
+        menuButton.style.opacity = "0.8";
+        menuButton.style.transform = "scale(1)";
       };
-      
+
       menuButton.onclick = () => this.showFloatingMenu();
-      
+
       // Add to page when DOM is ready
       const addMenu = () => {
         if (document.body) {
@@ -311,14 +341,14 @@
 
     showFloatingMenu() {
       // Remove existing menu
-      const existing = document.getElementById('visited-links-floating-menu');
+      const existing = document.getElementById("visited-links-floating-menu");
       if (existing) {
         existing.remove();
         return;
       }
 
-      const menu = document.createElement('div');
-      menu.id = 'visited-links-floating-menu';
+      const menu = document.createElement("div");
+      menu.id = "visited-links-floating-menu";
       menu.style.cssText = `
         position: fixed;
         top: 70px;
@@ -332,13 +362,13 @@
       `;
 
       const menuItems = [
-        { text: '🎨 Change Color', action: () => this.changeColor() },
-        { text: '⚙️ Toggle Script', action: () => this.toggleScript() },
-        { text: '🚫 Manage Exceptions', action: () => this.manageExceptions() }
+        { text: "🎨 Change Color", action: () => this.changeColor() },
+        { text: "⚙️ Toggle Script", action: () => this.toggleScript() },
+        { text: "🚫 Manage Exceptions", action: () => this.manageExceptions() },
       ];
 
-      menuItems.forEach(item => {
-        const button = document.createElement('div');
+      menuItems.forEach((item) => {
+        const button = document.createElement("div");
         button.textContent = item.text;
         button.style.cssText = `
           padding: 12px 15px;
@@ -346,19 +376,19 @@
           border-bottom: 1px solid #eee;
           transition: background 0.2s ease;
         `;
-        
-        button.onmouseenter = () => button.style.background = '#f5f5f5';
-        button.onmouseleave = () => button.style.background = 'white';
+
+        button.onmouseenter = () => (button.style.background = "#f5f5f5");
+        button.onmouseleave = () => (button.style.background = "white");
         button.onclick = () => {
           item.action();
           menu.remove();
         };
-        
+
         menu.appendChild(button);
       });
 
       document.body.appendChild(menu);
-      
+
       // Auto-hide after 5 seconds
       setTimeout(() => {
         if (menu.parentNode) menu.remove();
