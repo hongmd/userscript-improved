@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist flat UI userscript for visited links customization
-// @version      0.5.5
+// @version      0.5.6
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -75,32 +75,45 @@
     CSS_TEMPLATE: "a:visited, a:visited * { color: %COLOR% !important; }",
   });
 
-  // Pastel color palette with names - soft and eye-friendly colors
+  // Color palette with names and style descriptions - comprehensive selection
   const COLOR_PALETTE = Object.freeze([
-    { color: "#93c5fd", name: "Pastel Blue" },
-    { color: "#fca5a5", name: "Pastel Red" },
-    { color: "#86efac", name: "Pastel Green" },
-    { color: "#fed7aa", name: "Pastel Orange" },
-    { color: "#f97316", name: "Vibrant Orange" },
-    { color: "#c4b5fd", name: "Pastel Purple" },
-    { color: "#f9a8d4", name: "Pastel Pink" },
-    { color: "#7dd3fc", name: "Pastel Sky Blue" },
-    { color: "#bef264", name: "Pastel Lime" },
-    { color: "#fde047", name: "Pastel Yellow" },
-    { color: "#fb7185", name: "Pastel Rose" },
-    { color: "#a78bfa", name: "Pastel Violet" },
-    { color: "#34d399", name: "Pastel Emerald" },
-    // Highlight colors for better link visibility
-    { color: "#dc2626", name: "Bold Red" },
-    { color: "#2563eb", name: "Bold Blue" },
-    { color: "#059669", name: "Bold Green" },
-    { color: "#7c3aed", name: "Bold Purple" },
-    { color: "#db2777", name: "Bold Pink" },
-    { color: "#ea580c", name: "Bold Orange" },
-    { color: "#0891b2", name: "Bold Cyan" },
-    { color: "#65a30d", name: "Bold Lime" },
-    { color: "#ca8a04", name: "Bold Yellow" },
-    { color: "#be123c", name: "Bold Rose" },
+    // Pastel Colors - Soft & Eye-friendly
+    { color: "#93c5fd", name: "Pastel Blue", desc: "Soft, calming" },
+    { color: "#fca5a5", name: "Pastel Red", desc: "Gentle, warm" },
+    { color: "#86efac", name: "Pastel Green", desc: "Fresh, natural" },
+    { color: "#fed7aa", name: "Pastel Orange", desc: "Light, cheerful" },
+    { color: "#f97316", name: "Vibrant Orange", desc: "Energetic, bold" },
+    { color: "#c4b5fd", name: "Pastel Purple", desc: "Elegant, soft" },
+    { color: "#f9a8d4", name: "Pastel Pink", desc: "Sweet, feminine" },
+    { color: "#7dd3fc", name: "Pastel Sky Blue", desc: "Airy, peaceful" },
+    { color: "#bef264", name: "Pastel Lime", desc: "Bright, lively" },
+    { color: "#fde047", name: "Pastel Yellow", desc: "Sunny, optimistic" },
+    { color: "#fb7185", name: "Pastel Rose", desc: "Romantic, soft" },
+    { color: "#a78bfa", name: "Pastel Violet", desc: "Mystical, calm" },
+    { color: "#34d399", name: "Pastel Emerald", desc: "Rich, serene" },
+    
+    // Bold Highlight Colors - Strong Visibility
+    { color: "#dc2626", name: "Bold Red", desc: "Strong, attention" },
+    { color: "#2563eb", name: "Bold Blue", desc: "Professional, trust" },
+    { color: "#059669", name: "Bold Green", desc: "Success, nature" },
+    { color: "#7c3aed", name: "Bold Purple", desc: "Creative, luxury" },
+    { color: "#db2777", name: "Bold Pink", desc: "Vibrant, modern" },
+    { color: "#ea580c", name: "Bold Orange", desc: "Dynamic, warm" },
+    { color: "#0891b2", name: "Bold Cyan", desc: "Tech, cool" },
+    { color: "#65a30d", name: "Bold Lime", desc: "Electric, fresh" },
+    { color: "#ca8a04", name: "Bold Yellow", desc: "Warning, bright" },
+    { color: "#be123c", name: "Bold Rose", desc: "Passionate, deep" },
+    
+    // Primary Colors - Classic & Standard
+    { color: "#000000", name: "Black", desc: "Classic, strong" },
+    { color: "#ffffff", name: "White", desc: "Clean, minimal" },
+    { color: "#6b7280", name: "Gray", desc: "Neutral, subtle" },
+    { color: "#ef4444", name: "Pure Red", desc: "Primary, bold" },
+    { color: "#3b82f6", name: "Pure Blue", desc: "Primary, reliable" },
+    { color: "#10b981", name: "Pure Green", desc: "Primary, fresh" },
+    { color: "#8b5cf6", name: "Pure Purple", desc: "Primary, royal" },
+    { color: "#f59e0b", name: "Pure Orange", desc: "Primary, energetic" },
+    { color: "#eab308", name: "Pure Yellow", desc: "Primary, bright" },
   ]);
 
   //// Utility Functions - ES2023 Enhanced
@@ -340,15 +353,15 @@
     },
 
     createSimpleColorPicker() {
-      // Simple prompt-based color picker with color names
+      // Enhanced color picker with style descriptions
       const currentColor = ConfigManager.get("COLOR");
       
       const colorOptions = COLOR_PALETTE.map((item, index) => 
-        `${index + 1}. ${item.name} (${item.color})`
+        `${index + 1}. ${item.name} - ${item.desc} (${item.color})`
       ).join('\n');
       
       const choice = prompt(
-        `Choose a color for visited links:\n\n${colorOptions}\n\nEnter number (1-${COLOR_PALETTE.length}) or custom color code:`,
+        `🎨 Choose a color for visited links:\n\n${colorOptions}\n\nEnter number (1-${COLOR_PALETTE.length}) or custom color code:`,
         currentColor
       );
 
@@ -369,10 +382,12 @@
         ConfigManager.set("COLOR", selectedColor);
         StyleManager.updateStyles();
         
-        // Find color name for confirmation message
+        // Enhanced confirmation message with style description
         const colorItem = COLOR_PALETTE.find(item => item.color === selectedColor);
-        const colorName = colorItem ? colorItem.name : "Custom Color";
-        alert(`Color changed to: ${colorName} (${selectedColor})`);
+        const colorInfo = colorItem 
+          ? `${colorItem.name} - ${colorItem.desc}`
+          : "Custom Color";
+        alert(`✅ Color changed to: ${colorInfo} (${selectedColor})`);
       }
     },
 
