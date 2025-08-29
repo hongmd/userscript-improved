@@ -2,7 +2,7 @@
 // @name        Visited Links Enhanced
 // @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.1.2
+// @version     0.2.0
 // @include     http*
 // @include     https*
 // @match       http://*/*
@@ -230,13 +230,11 @@
     },
 
     updateStyles() {
-      if (!this.styleElement) {
-        this.createStyleElement();
-      }
+      this.styleElement ||= this.createStyleElement();
 
       const color = ConfigManager.get("COLOR");
       if (Utils.isValidColor(color)) {
-        const css = CONFIG.CSS_TEMPLATE.replace("%COLOR%", color);
+        const css = CONFIG.CSS_TEMPLATE.replaceAll("%COLOR%", color);
         this.styleElement.textContent = css;
       }
     },
@@ -298,7 +296,7 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        z-index: 999998;
+        z-index: 999_998;
         font-size: 18px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         transition: all 0.3s ease;
@@ -306,13 +304,13 @@
       `;
 
       menuButton.onmouseenter = () => {
-        menuButton.style.opacity = "1";
-        menuButton.style.transform = "scale(1.1)";
+        menuButton.style.opacity ||= "1";
+        menuButton.style.transform ||= "scale(1.1)";
       };
 
       menuButton.onmouseleave = () => {
-        menuButton.style.opacity = "0.8";
-        menuButton.style.transform = "scale(1)";
+        menuButton.style.opacity ||= "0.8";
+        menuButton.style.transform ||= "scale(1)";
       };
 
       menuButton.onclick = () => this.showFloatingMenu();
@@ -345,7 +343,7 @@
         background: white;
         border-radius: 8px;
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        z-index: 999999;
+        z-index: 999_999;
         overflow: hidden;
         min-width: 200px;
       `;
@@ -366,8 +364,8 @@
           transition: background 0.2s ease;
         `;
 
-        button.onmouseenter = () => (button.style.background = "#f5f5f5");
-        button.onmouseleave = () => (button.style.background = "white");
+        button.onmouseenter = () => (button.style.background ||= "#f5f5f5");
+        button.onmouseleave = () => (button.style.background ||= "white");
         button.onclick = () => {
           item.action();
           menu.remove();
@@ -418,7 +416,7 @@
                 width: 100%;
                 height: 100%;
                 background: rgba(0, 0, 0, 0.5);
-                z-index: 999999;
+                z-index: 999_999;
                 display: flex;
                 justify-content: center;
                 align-items: center;
@@ -619,7 +617,7 @@
                 color: white;
                 font-family: Arial, sans-serif;
                 font-size: 14px;
-                z-index: 1000000;
+                z-index: 1_000_000;
                 opacity: 0;
                 transition: opacity 0.3s ease;
                 background: ${
