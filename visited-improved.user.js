@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist flat UI userscript for visited links customization
-// @version      0.5.0
+// @version      0.5.1
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -67,7 +67,7 @@
       ENABLED: "script_enabled",
     }),
     DEFAULTS: Object.freeze({
-      COLOR: "#2563eb", // Simple blue color
+      COLOR: "#f97316", // orange color
       EXCEPT_SITES: "mail.live.com,gmail.com",
       ENABLED: true,
     }),
@@ -75,10 +75,20 @@
     CSS_TEMPLATE: "a:visited, a:visited * { color: %COLOR% !important; }",
   });
 
-  // Simple color palette - flat colors
+  // Pastel color palette - soft and eye-friendly colors
   const COLOR_PALETTE = Object.freeze([
-    "#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed",
-    "#db2777", "#0891b2", "#65a30d", "#ca8a04", "#be123c",
+    "#93c5fd", // Pastel Blue
+    "#fca5a5", // Pastel Red
+    "#86efac", // Pastel Green
+    "#fed7aa", // Pastel Orange
+    "#c4b5fd", // Pastel Purple
+    "#f9a8d4", // Pastel Pink
+    "#7dd3fc", // Pastel Sky Blue
+    "#bef264", // Pastel Lime
+    "#fde047", // Pastel Yellow
+    "#fb7185", // Pastel Rose
+    "#a78bfa", // Pastel Violet
+    "#34d399", // Pastel Emerald
   ]);
 
   //// Utility Functions - ES2023 Enhanced
