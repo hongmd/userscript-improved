@@ -2,206 +2,403 @@
 // @name        Visited Links Enhanced
 // @namespace   iFantz7E.VisitedLiteEnhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.0.1
+// @version     0.0.2
 // @include     http*
+// @include     https*
+// @match       http://*/*
+// @match       https://*/*
 // @icon        https://cdn.jsdelivr.net/gh/hongmd/cdn-web@main/logo.svg
 // @run-at      document-start
 // @grant       GM_setValue
 // @grant       GM_getValue
 // @grant       GM_registerMenuCommand
+// @grant       GM_info
+// @compatible  ScriptCat
+// @compatible  Tampermonkey
+// @compatible  Greasemonkey
 // @copyright   2025, Enhanced by AI Assistant ft. Hongmd
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function () {
+  "use strict";
 
-    //// Enhanced Configuration with Storage
-    const CONFIG = {
-        STORAGE_KEYS: {
-            COLOR: 'visited_color',
-            EXCEPT_SITES: 'except_sites',
-            ENABLED: 'script_enabled'
-        },
-        DEFAULTS: {
-            COLOR: 'LightCoral',
-            EXCEPT_SITES: 'mail.live.com,gmail.com',
-            ENABLED: true
-        },
-        STYLE_ID: 'visited-lite-enhanced-style',
-        CSS_TEMPLATE: 'a:visited, a:visited * { color: %COLOR% !important; transition: color 0.2s ease; }'
-    };
+  // ScriptCat & Browser Compatibility Detection
+  const ENVIRONMENT = {
+    isScriptCat: typeof GM_info !== 'undefined' && GM_info.scriptHandler === 'ScriptCat',
+    isFirefox: navigator.userAgent.toLowerCase().includes('firefox'),
+    isTampermonkey: typeof GM_info !== 'undefined' && GM_info.scriptHandler === 'Tampermonkey',
+    isGreasemonkey: typeof GM_info !== 'undefined' && GM_info.scriptHandler === 'Greasemonkey',
+    
+    // Feature detection
+    hasStorage: typeof GM_setValue !== 'undefined' && typeof GM_getValue !== 'undefined',
+    hasMenuCommand: typeof GM_registerMenuCommand !== 'undefined'
+  };
 
-    // Enhanced color palette with better accessibility
-    const COLOR_PALETTE = [
-        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
-        '#FF9FF3', '#54A0FF', '#5F27CD', '#00D2D3', '#FF9F43',
-        '#EE5A24', '#0984E3', '#A29BFE', '#FD79A8', '#E17055',
-        '#00B894', '#FDCB6E', '#6C5CE7', '#74B9FF', '#00CEC9'
-    ];
+  // Compatibility logging
+  console.log('[Visited Links Enhanced] Environment detected:', {
+    handler: ENVIRONMENT.isScriptCat ? 'ScriptCat' : 
+             ENVIRONMENT.isTampermonkey ? 'Tampermonkey' : 
+             ENVIRONMENT.isGreasemonkey ? 'Greasemonkey' : 'Unknown',
+    browser: ENVIRONMENT.isFirefox ? 'Firefox' : 'Other',
+    features: {
+      storage: ENVIRONMENT.hasStorage,
+      menuCommand: ENVIRONMENT.hasMenuCommand
+    }
+  });
 
-    //// Utility Functions
-    const Utils = {
-        // Debounce function for performance
-        debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        },
+  //// Enhanced Configuration with Storage
+  const CONFIG = {
+    STORAGE_KEYS: {
+      COLOR: "visited_color",
+      EXCEPT_SITES: "except_sites",
+      ENABLED: "script_enabled",
+    },
+    DEFAULTS: {
+      COLOR: "LightCoral",
+      EXCEPT_SITES: "mail.live.com,gmail.com",
+      ENABLED: true,
+    },
+    STYLE_ID: "visited-lite-enhanced-style",
+    CSS_TEMPLATE:
+      "a:visited, a:visited * { color: %COLOR% !important; transition: color 0.2s ease; }",
+  };
 
-        // Validate color format
-        isValidColor(color) {
-            const s = new Option().style;
-            s.color = color;
-            return s.color !== '';
-        },
+  // Enhanced color palette with better accessibility
+  const COLOR_PALETTE = [
+    "#FF6B6B",
+    "#4ECDC4",
+    "#45B7D1",
+    "#96CEB4",
+    "#FECA57",
+    "#FF9FF3",
+    "#54A0FF",
+    "#5F27CD",
+    "#00D2D3",
+    "#FF9F43",
+    "#EE5A24",
+    "#0984E3",
+    "#A29BFE",
+    "#FD79A8",
+    "#E17055",
+    "#00B894",
+    "#FDCB6E",
+    "#6C5CE7",
+    "#74B9FF",
+    "#00CEC9",
+  ];
 
-        // Get domain from URL
-        getDomain(url) {
-            try {
-                return new URL(url).hostname;
-            } catch (e) {
-                return '';
-            }
-        },
+  //// Utility Functions
+  const Utils = {
+    // Debounce function for performance
+    debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    },
 
-        // Sanitize input
-        sanitizeInput(input) {
-            return input.replace(/[<>'"]/g, '');
+    // Validate color format
+    isValidColor(color) {
+      const s = new Option().style;
+      s.color = color;
+      return s.color !== "";
+    },
+
+    // Get domain from URL
+    getDomain(url) {
+      try {
+        return new URL(url).hostname;
+      } catch (e) {
+        return "";
+      }
+    },
+
+    // Sanitize input
+    sanitizeInput(input) {
+      return input.replace(/[<>'"]/g, "");
+    },
+  };
+
+  //// Configuration Manager with ScriptCat Compatibility
+  const ConfigManager = {
+    // Storage fallback system
+    _storagePrefix: 'visited_links_enhanced_',
+    
+    get(key) {
+      const storageKey = CONFIG.STORAGE_KEYS[key];
+      const defaultValue = CONFIG.DEFAULTS[key];
+      
+      // Try GM_getValue first (ScriptCat/Tampermonkey)
+      if (ENVIRONMENT.hasStorage) {
+        try {
+          return GM_getValue(storageKey, defaultValue);
+        } catch (e) {
+          console.warn('[ScriptCat Compatibility] GM_getValue failed, trying localStorage:', e);
         }
-    };
+      }
+      
+      // Fallback to localStorage for ScriptCat compatibility
+      try {
+        const stored = localStorage.getItem(this._storagePrefix + storageKey);
+        return stored !== null ? JSON.parse(stored) : defaultValue;
+      } catch (e) {
+        console.warn('[Storage] Both GM and localStorage failed:', e);
+        return defaultValue;
+      }
+    },
 
-    //// Configuration Manager
-    const ConfigManager = {
-        get(key) {
-            try {
-                return GM_getValue(CONFIG.STORAGE_KEYS[key], CONFIG.DEFAULTS[key]);
-            } catch (e) {
-                return CONFIG.DEFAULTS[key];
-            }
-        },
-
-        set(key, value) {
-            try {
-                GM_setValue(CONFIG.STORAGE_KEYS[key], value);
-                return true;
-            } catch (e) {
-                console.warn('Failed to save config:', e);
-                return false;
-            }
-        },
-
-        isExceptSite(url) {
-            const exceptSites = this.get('EXCEPT_SITES').split(',')
-                .map(site => site.trim().toLowerCase())
-                .filter(site => site.length > 0);
-            
-            const currentDomain = Utils.getDomain(url).toLowerCase();
-            
-            return exceptSites.some(site => {
-                // Remove protocol and www prefix for comparison
-                const cleanSite = site.replace(/^(https?:\/\/)?(www\.)?/, '');
-                const cleanDomain = currentDomain.replace(/^www\./, '');
-                
-                return cleanDomain.includes(cleanSite) || cleanSite.includes(cleanDomain);
-            });
+    set(key, value) {
+      const storageKey = CONFIG.STORAGE_KEYS[key];
+      
+      // Try GM_setValue first
+      if (ENVIRONMENT.hasStorage) {
+        try {
+          GM_setValue(storageKey, value);
+          return true;
+        } catch (e) {
+          console.warn('[ScriptCat Compatibility] GM_setValue failed, trying localStorage:', e);
         }
-    };
+      }
+      
+      // Fallback to localStorage
+      try {
+        localStorage.setItem(this._storagePrefix + storageKey, JSON.stringify(value));
+        return true;
+      } catch (e) {
+        console.warn('[Storage] Both GM and localStorage failed:', e);
+        return false;
+      }
+    },
 
-    //// Style Manager
-    const StyleManager = {
-        styleElement: null,
+    isExceptSite(url) {
+      const exceptSites = this.get("EXCEPT_SITES")
+        .split(",")
+        .map((site) => site.trim().toLowerCase())
+        .filter((site) => site.length > 0);
 
-        init() {
-            this.createStyleElement();
-        },
+      const currentDomain = Utils.getDomain(url).toLowerCase();
 
-        createStyleElement() {
-            // Remove existing style if present
-            const existing = document.getElementById(CONFIG.STYLE_ID);
-            if (existing) {
-                existing.remove();
-            }
+      return exceptSites.some((site) => {
+        // Remove protocol and www prefix for comparison
+        const cleanSite = site.replace(/^(https?:\/\/)?(www\.)?/, "");
+        const cleanDomain = currentDomain.replace(/^www\./, "");
 
-            this.styleElement = document.createElement('style');
-            this.styleElement.id = CONFIG.STYLE_ID;
-            this.styleElement.type = 'text/css';
-            
-            // Try to append to head, fallback to document
-            const target = document.head || document.documentElement;
-            if (target) {
-                target.appendChild(this.styleElement);
-            }
-        },
+        return (
+          cleanDomain.includes(cleanSite) || cleanSite.includes(cleanDomain)
+        );
+      });
+    },
+  };
 
-        updateStyles() {
-            if (!this.styleElement) {
-                this.createStyleElement();
-            }
+  //// Style Manager
+  const StyleManager = {
+    styleElement: null,
 
-            const color = ConfigManager.get('COLOR');
-            if (Utils.isValidColor(color)) {
-                const css = CONFIG.CSS_TEMPLATE.replace('%COLOR%', color);
-                this.styleElement.textContent = css;
-            }
-        },
+    init() {
+      this.createStyleElement();
+    },
 
-        removeStyles() {
-            if (this.styleElement) {
-                this.styleElement.textContent = '';
-            }
+    createStyleElement() {
+      // Remove existing style if present
+      const existing = document.getElementById(CONFIG.STYLE_ID);
+      if (existing) {
+        existing.remove();
+      }
+
+      this.styleElement = document.createElement("style");
+      this.styleElement.id = CONFIG.STYLE_ID;
+      this.styleElement.type = "text/css";
+
+      // Try to append to head, fallback to document
+      const target = document.head || document.documentElement;
+      if (target) {
+        target.appendChild(this.styleElement);
+      }
+    },
+
+    updateStyles() {
+      if (!this.styleElement) {
+        this.createStyleElement();
+      }
+
+      const color = ConfigManager.get("COLOR");
+      if (Utils.isValidColor(color)) {
+        const css = CONFIG.CSS_TEMPLATE.replace("%COLOR%", color);
+        this.styleElement.textContent = css;
+      }
+    },
+
+    removeStyles() {
+      if (this.styleElement) {
+        this.styleElement.textContent = "";
+      }
+    },
+  };
+
+  //// Menu System with ScriptCat Compatibility
+  const MenuManager = {
+    init() {
+      // Try to register menu commands (ScriptCat/Tampermonkey support)
+      if (ENVIRONMENT.hasMenuCommand) {
+        try {
+          GM_registerMenuCommand("🎨 Change Color", this.changeColor.bind(this));
+          GM_registerMenuCommand("⚙️ Toggle Visited Links", this.toggleScript.bind(this));
+          GM_registerMenuCommand("🚫 Manage Exception Sites", this.manageExceptions.bind(this));
+          
+          console.log('[ScriptCat] Menu commands registered successfully');
+        } catch (e) {
+          console.warn('[ScriptCat] Menu registration failed:', e);
+          this.createFloatingMenu();
         }
-    };
+      } else {
+        console.log('[ScriptCat] GM_registerMenuCommand not available, creating floating menu');
+        this.createFloatingMenu();
+      }
+    },
 
-    //// Menu System
-    const MenuManager = {
-        init() {
-            try {
-                GM_registerMenuCommand('Toggle Visited Links', this.toggleScript.bind(this));
-                GM_registerMenuCommand('Change Color', this.changeColor.bind(this));
-                GM_registerMenuCommand('Manage Exception Sites', this.manageExceptions.bind(this));
-            } catch (e) {
-                console.warn('Menu commands not available');
-            }
-        },
+    // Fallback floating menu for when GM_registerMenuCommand is not available
+    createFloatingMenu() {
+      // Create floating menu button
+      const menuButton = document.createElement('div');
+      menuButton.id = 'visited-links-menu-button';
+      menuButton.innerHTML = '🎨';
+      menuButton.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 40px;
+        height: 40px;
+        background: #4CAF50;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 999998;
+        font-size: 18px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+        opacity: 0.8;
+      `;
+      
+      menuButton.onmouseenter = () => {
+        menuButton.style.opacity = '1';
+        menuButton.style.transform = 'scale(1.1)';
+      };
+      
+      menuButton.onmouseleave = () => {
+        menuButton.style.opacity = '0.8';
+        menuButton.style.transform = 'scale(1)';
+      };
+      
+      menuButton.onclick = () => this.showFloatingMenu();
+      
+      // Add to page when DOM is ready
+      const addMenu = () => {
+        if (document.body) {
+          document.body.appendChild(menuButton);
+        } else {
+          setTimeout(addMenu, 100);
+        }
+      };
+      addMenu();
+    },
 
-        toggleScript() {
-            const currentState = ConfigManager.get('ENABLED');
-            const newState = !currentState;
-            ConfigManager.set('ENABLED', newState);
-            
-            if (newState) {
-                StyleManager.updateStyles();
-                this.showNotification('Visited Links Enhanced: Enabled', 'success');
-            } else {
-                StyleManager.removeStyles();
-                this.showNotification('Visited Links Enhanced: Disabled', 'info');
-            }
-        },
+    showFloatingMenu() {
+      // Remove existing menu
+      const existing = document.getElementById('visited-links-floating-menu');
+      if (existing) {
+        existing.remove();
+        return;
+      }
 
-        changeColor() {
-            this.createColorPicker();
-        },
+      const menu = document.createElement('div');
+      menu.id = 'visited-links-floating-menu';
+      menu.style.cssText = `
+        position: fixed;
+        top: 70px;
+        right: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        z-index: 999999;
+        overflow: hidden;
+        min-width: 200px;
+      `;
 
-        createColorPicker() {
-            // Remove existing picker if present
-            const existingPicker = document.getElementById('visited-links-color-picker');
-            if (existingPicker) {
-                existingPicker.remove();
-                return;
-            }
+      const menuItems = [
+        { text: '🎨 Change Color', action: () => this.changeColor() },
+        { text: '⚙️ Toggle Script', action: () => this.toggleScript() },
+        { text: '🚫 Manage Exceptions', action: () => this.manageExceptions() }
+      ];
 
-            const currentColor = ConfigManager.get('COLOR');
-            
-            // Create overlay
-            const overlay = document.createElement('div');
-            overlay.id = 'visited-links-color-picker';
-            overlay.style.cssText = `
+      menuItems.forEach(item => {
+        const button = document.createElement('div');
+        button.textContent = item.text;
+        button.style.cssText = `
+          padding: 12px 15px;
+          cursor: pointer;
+          border-bottom: 1px solid #eee;
+          transition: background 0.2s ease;
+        `;
+        
+        button.onmouseenter = () => button.style.background = '#f5f5f5';
+        button.onmouseleave = () => button.style.background = 'white';
+        button.onclick = () => {
+          item.action();
+          menu.remove();
+        };
+        
+        menu.appendChild(button);
+      });
+
+      document.body.appendChild(menu);
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        if (menu.parentNode) menu.remove();
+      }, 5000);
+    },
+
+    toggleScript() {
+      const currentState = ConfigManager.get("ENABLED");
+      const newState = !currentState;
+      ConfigManager.set("ENABLED", newState);
+
+      if (newState) {
+        StyleManager.updateStyles();
+        this.showNotification("Visited Links Enhanced: Enabled", "success");
+      } else {
+        StyleManager.removeStyles();
+        this.showNotification("Visited Links Enhanced: Disabled", "info");
+      }
+    },
+
+    changeColor() {
+      this.createColorPicker();
+    },
+
+    createColorPicker() {
+      // Remove existing picker if present
+      const existingPicker = document.getElementById(
+        "visited-links-color-picker"
+      );
+      if (existingPicker) {
+        existingPicker.remove();
+        return;
+      }
+
+      const currentColor = ConfigManager.get("COLOR");
+
+      // Create overlay
+      const overlay = document.createElement("div");
+      overlay.id = "visited-links-color-picker";
+      overlay.style.cssText = `
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -215,9 +412,9 @@
                 font-family: Arial, sans-serif;
             `;
 
-            // Create picker dialog
-            const picker = document.createElement('div');
-            picker.style.cssText = `
+      // Create picker dialog
+      const picker = document.createElement("div");
+      picker.style.cssText = `
                 background: white;
                 border-radius: 10px;
                 padding: 20px;
@@ -228,7 +425,7 @@
                 overflow-y: auto;
             `;
 
-            picker.innerHTML = `
+      picker.innerHTML = `
                 <h3 style="margin: 0 0 15px 0; text-align: center; color: #333;">
                     Choose Visited Link Color
                 </h3>
@@ -245,7 +442,9 @@
                     <label style="display: block; margin-bottom: 5px; color: #333; font-weight: bold;">
                         Custom Color:
                     </label>
-                    <input type="color" id="custom-color" value="${this.colorToHex(currentColor)}" 
+                    <input type="color" id="custom-color" value="${this.colorToHex(
+                      currentColor
+                    )}" 
                            style="width: 100%; height: 40px; border: none; border-radius: 5px; cursor: pointer;">
                 </div>
                 <div style="margin-bottom: 15px;">
@@ -278,109 +477,127 @@
                 </div>
             `;
 
-            // Add color grid
-            const colorGrid = picker.querySelector('#color-grid');
-            COLOR_PALETTE.forEach(color => {
-                const colorButton = document.createElement('div');
-                colorButton.style.cssText = `
+      // Add color grid
+      const colorGrid = picker.querySelector("#color-grid");
+      COLOR_PALETTE.forEach((color) => {
+        const colorButton = document.createElement("div");
+        colorButton.style.cssText = `
                     width: 40px;
                     height: 40px;
                     background-color: ${color};
                     border-radius: 5px;
                     cursor: pointer;
-                    border: 2px solid ${color === currentColor ? '#333' : 'transparent'};
+                    border: 2px solid ${
+                      color === currentColor ? "#333" : "transparent"
+                    };
                     transition: all 0.2s ease;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     position: relative;
                 `;
-                
-                colorButton.title = color;
-                colorButton.onclick = () => {
-                    // Update all inputs
-                    picker.querySelector('#custom-color').value = color;
-                    picker.querySelector('#custom-color-text').value = color;
-                    
-                    // Update border selection
-                    colorGrid.querySelectorAll('div').forEach(btn => {
-                        btn.style.border = '2px solid transparent';
-                    });
-                    colorButton.style.border = '2px solid #333';
-                };
 
-                colorGrid.appendChild(colorButton);
-            });
+        colorButton.title = color;
+        colorButton.onclick = () => {
+          // Update all inputs
+          picker.querySelector("#custom-color").value = color;
+          picker.querySelector("#custom-color-text").value = color;
 
-            // Event listeners
-            picker.querySelector('#custom-color').onchange = (e) => {
-                picker.querySelector('#custom-color-text').value = e.target.value;
-                this.updateColorSelection(colorGrid, e.target.value);
-            };
+          // Update border selection
+          colorGrid.querySelectorAll("div").forEach((btn) => {
+            btn.style.border = "2px solid transparent";
+          });
+          colorButton.style.border = "2px solid #333";
+        };
 
-            picker.querySelector('#custom-color-text').oninput = (e) => {
-                if (Utils.isValidColor(e.target.value)) {
-                    picker.querySelector('#custom-color').value = this.colorToHex(e.target.value);
-                    this.updateColorSelection(colorGrid, e.target.value);
-                }
-            };
+        colorGrid.appendChild(colorButton);
+      });
 
-            picker.querySelector('#apply-color').onclick = () => {
-                const selectedColor = picker.querySelector('#custom-color-text').value.trim();
-                if (selectedColor && Utils.isValidColor(selectedColor)) {
-                    ConfigManager.set('COLOR', selectedColor);
-                    StyleManager.updateStyles();
-                    overlay.remove();
-                    this.showNotification(`Color changed to: ${selectedColor}`, 'success');
-                } else {
-                    this.showNotification('Invalid color format. Please try again.', 'error');
-                }
-            };
+      // Event listeners
+      picker.querySelector("#custom-color").onchange = (e) => {
+        picker.querySelector("#custom-color-text").value = e.target.value;
+        this.updateColorSelection(colorGrid, e.target.value);
+      };
 
-            picker.querySelector('#cancel-color').onclick = () => {
-                overlay.remove();
-            };
+      picker.querySelector("#custom-color-text").oninput = (e) => {
+        if (Utils.isValidColor(e.target.value)) {
+          picker.querySelector("#custom-color").value = this.colorToHex(
+            e.target.value
+          );
+          this.updateColorSelection(colorGrid, e.target.value);
+        }
+      };
 
-            overlay.onclick = (e) => {
-                if (e.target === overlay) {
-                    overlay.remove();
-                }
-            };
+      picker.querySelector("#apply-color").onclick = () => {
+        const selectedColor = picker
+          .querySelector("#custom-color-text")
+          .value.trim();
+        if (selectedColor && Utils.isValidColor(selectedColor)) {
+          ConfigManager.set("COLOR", selectedColor);
+          StyleManager.updateStyles();
+          overlay.remove();
+          this.showNotification(
+            `Color changed to: ${selectedColor}`,
+            "success"
+          );
+        } else {
+          this.showNotification(
+            "Invalid color format. Please try again.",
+            "error"
+          );
+        }
+      };
 
-            overlay.appendChild(picker);
-            document.body.appendChild(overlay);
-        },
+      picker.querySelector("#cancel-color").onclick = () => {
+        overlay.remove();
+      };
 
-        colorToHex(color) {
-            // Convert color to hex for color input
-            const div = document.createElement('div');
-            div.style.color = color;
-            document.body.appendChild(div);
-            const computedColor = getComputedStyle(div).color;
-            document.body.removeChild(div);
-            
-            const rgb = computedColor.match(/\d+/g);
-            if (rgb && rgb.length >= 3) {
-                return '#' + rgb.slice(0, 3).map(x => {
-                    const hex = parseInt(x).toString(16);
-                    return hex.length === 1 ? '0' + hex : hex;
-                }).join('');
-            }
-            return '#FF6B6B'; // fallback
-        },
+      overlay.onclick = (e) => {
+        if (e.target === overlay) {
+          overlay.remove();
+        }
+      };
 
-        updateColorSelection(colorGrid, selectedColor) {
-            colorGrid.querySelectorAll('div').forEach(btn => {
-                btn.style.border = '2px solid transparent';
-                if (btn.title === selectedColor) {
-                    btn.style.border = '2px solid #333';
-                }
-            });
-        },
+      overlay.appendChild(picker);
+      document.body.appendChild(overlay);
+    },
 
-        showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.style.cssText = `
+    colorToHex(color) {
+      // Convert color to hex for color input
+      const div = document.createElement("div");
+      div.style.color = color;
+      document.body.appendChild(div);
+      const computedColor = getComputedStyle(div).color;
+      document.body.removeChild(div);
+
+      const rgb = computedColor.match(/\d+/g);
+      if (rgb && rgb.length >= 3) {
+        return (
+          "#" +
+          rgb
+            .slice(0, 3)
+            .map((x) => {
+              const hex = parseInt(x).toString(16);
+              return hex.length === 1 ? "0" + hex : hex;
+            })
+            .join("")
+        );
+      }
+      return "#FF6B6B"; // fallback
+    },
+
+    updateColorSelection(colorGrid, selectedColor) {
+      colorGrid.querySelectorAll("div").forEach((btn) => {
+        btn.style.border = "2px solid transparent";
+        if (btn.title === selectedColor) {
+          btn.style.border = "2px solid #333";
+        }
+      });
+    },
+
+    showNotification(message, type = "info") {
+      const notification = document.createElement("div");
+      notification.style.cssText = `
                 position: fixed;
                 top: 20px;
                 right: 20px;
@@ -392,127 +609,132 @@
                 z-index: 1000000;
                 opacity: 0;
                 transition: opacity 0.3s ease;
-                background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+                background: ${
+                  type === "success"
+                    ? "#4CAF50"
+                    : type === "error"
+                    ? "#f44336"
+                    : "#2196F3"
+                };
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
             `;
-            
-            notification.textContent = message;
-            document.body.appendChild(notification);
-            
-            // Fade in
-            setTimeout(() => {
-                notification.style.opacity = '1';
-            }, 10);
-            
-            // Auto remove
-            setTimeout(() => {
-                notification.style.opacity = '0';
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 300);
-            }, 3000);
-        },
 
-        manageExceptions() {
-            const currentExceptions = ConfigManager.get('EXCEPT_SITES');
-            const newExceptions = prompt(
-                'Enter domains to exclude (comma-separated):\n\nExample: gmail.com, facebook.com, twitter.com',
-                currentExceptions
-            );
-            
-            if (newExceptions !== null) {
-                const sanitizedExceptions = Utils.sanitizeInput(newExceptions.trim());
-                ConfigManager.set('EXCEPT_SITES', sanitizedExceptions);
-                this.showNotification('Exception sites updated!', 'success');
-                
-                // Reapply styles based on new exceptions
-                App.checkAndApplyStyles();
-            }
-        }
-    };
+      notification.textContent = message;
+      document.body.appendChild(notification);
 
-    //// Main Application
-    const App = {
-        init() {
-            // Initialize components
-            StyleManager.init();
-            MenuManager.init();
-            
-            // Apply styles if enabled and not on exception site
-            this.checkAndApplyStyles();
-            
-            // Handle dynamic content changes
-            this.observeChanges();
-        },
+      // Fade in
+      setTimeout(() => {
+        notification.style.opacity = "1";
+      }, 10);
 
-        checkAndApplyStyles() {
-            const isEnabled = ConfigManager.get('ENABLED');
-            const currentUrl = document.documentURI || window.location.href;
-            
-            if (isEnabled && !ConfigManager.isExceptSite(currentUrl)) {
-                StyleManager.updateStyles();
-            } else {
-                StyleManager.removeStyles();
-            }
-        },
+      // Auto remove
+      setTimeout(() => {
+        notification.style.opacity = "0";
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
+      }, 3000);
+    },
 
-        observeChanges() {
-            // Debounced function to handle DOM changes
-            const debouncedUpdate = Utils.debounce(() => {
-                this.checkAndApplyStyles();
-            }, 100);
+    manageExceptions() {
+      const currentExceptions = ConfigManager.get("EXCEPT_SITES");
+      const newExceptions = prompt(
+        "Enter domains to exclude (comma-separated):\n\nExample: gmail.com, facebook.com, twitter.com",
+        currentExceptions
+      );
 
-            // Observer for dynamic content
-            if (window.MutationObserver) {
-                const observer = new MutationObserver(debouncedUpdate);
-                observer.observe(document.documentElement, {
-                    childList: true,
-                    subtree: true
-                });
-            }
+      if (newExceptions !== null) {
+        const sanitizedExceptions = Utils.sanitizeInput(newExceptions.trim());
+        ConfigManager.set("EXCEPT_SITES", sanitizedExceptions);
+        this.showNotification("Exception sites updated!", "success");
 
-            // Handle SPA navigation
-            window.addEventListener('popstate', debouncedUpdate);
-            
-            // Handle hash changes
-            window.addEventListener('hashchange', debouncedUpdate);
-        }
-    };
+        // Reapply styles based on new exceptions
+        App.checkAndApplyStyles();
+      }
+    },
+  };
 
-    //// Initialization
-    function initialize() {
-        // Wait for DOM to be available
-        if (document.documentElement) {
-            App.init();
-        } else {
-            // Fallback for very early execution
-            setTimeout(initialize, 10);
-        }
-    }
+  //// Main Application
+  const App = {
+    init() {
+      // Initialize components
+      StyleManager.init();
+      MenuManager.init();
 
-    // Start the script
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initialize);
+      // Apply styles if enabled and not on exception site
+      this.checkAndApplyStyles();
+
+      // Handle dynamic content changes
+      this.observeChanges();
+    },
+
+    checkAndApplyStyles() {
+      const isEnabled = ConfigManager.get("ENABLED");
+      const currentUrl = document.documentURI || window.location.href;
+
+      if (isEnabled && !ConfigManager.isExceptSite(currentUrl)) {
+        StyleManager.updateStyles();
+      } else {
+        StyleManager.removeStyles();
+      }
+    },
+
+    observeChanges() {
+      // Debounced function to handle DOM changes
+      const debouncedUpdate = Utils.debounce(() => {
+        this.checkAndApplyStyles();
+      }, 100);
+
+      // Observer for dynamic content
+      if (window.MutationObserver) {
+        const observer = new MutationObserver(debouncedUpdate);
+        observer.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+        });
+      }
+
+      // Handle SPA navigation
+      window.addEventListener("popstate", debouncedUpdate);
+
+      // Handle hash changes
+      window.addEventListener("hashchange", debouncedUpdate);
+    },
+  };
+
+  //// Initialization
+  function initialize() {
+    // Wait for DOM to be available
+    if (document.documentElement) {
+      App.init();
     } else {
-        initialize();
+      // Fallback for very early execution
+      setTimeout(initialize, 10);
     }
+  }
 
-    // Export for debugging (optional)
-    if (typeof window !== 'undefined') {
-        window.VisitedLinksEnhanced = {
-            config: ConfigManager,
-            style: StyleManager,
-            utils: Utils
-        };
-    }
+  // Start the script
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initialize);
+  } else {
+    initialize();
+  }
 
+  // Export for debugging (optional)
+  if (typeof window !== "undefined") {
+    window.VisitedLinksEnhanced = {
+      config: ConfigManager,
+      style: StyleManager,
+      utils: Utils,
+    };
+  }
 })();
 
 // Enhanced Features Added:
 // 1. Modern ES6+ syntax and best practices
-// 2. Persistent configuration storage
+// 2. Persistent configuration storage with localStorage fallback
 // 3. User-friendly menu system for settings
 // 4. Better error handling and validation
 // 5. Performance optimizations with debouncing
@@ -525,3 +747,7 @@
 // 12. Custom color input (hex, rgb, color names)
 // 13. Non-intrusive notification system
 // 14. Interactive UI with live preview
+// 15. ScriptCat compatibility with environment detection
+// 16. Firefox-specific optimizations
+// 17. Fallback floating menu when GM commands unavailable
+// 18. Cross-platform storage system (GM + localStorage)
