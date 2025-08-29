@@ -2,7 +2,7 @@
 // @name        Visited Links Enhanced
 // @namespace   com.userscript.visited-links-enhanced
 // @description Enhanced userscript to mark visited links with custom colors and improved performance
-// @version     0.2.0
+// @version     0.2.1
 // @include     http*
 // @include     https*
 // @match       http://*/*
@@ -607,11 +607,15 @@
     },
 
     showNotification(message, type = "info") {
+      // Check if floating menu button exists to adjust position
+      const hasFloatingButton = document.getElementById("visited-links-menu-button");
+      const rightPosition = hasFloatingButton ? "80px" : "20px";
+      
       const notification = document.createElement("div");
       notification.style.cssText = `
                 position: fixed;
                 top: 20px;
-                right: 20px;
+                right: ${rightPosition};
                 padding: 15px 20px;
                 border-radius: 5px;
                 color: white;
