@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Page Load Speed Monitor
 // @namespace    com.userscript.page-load-speed
-// @description  Ultra-lightweight page load speed monitor with dark transparent UI - minimal CPU/RAM impact
-// @version      1.4.0
+// @description  Ultra-lightweight page load speed monitor with dark transparent UI and auto-hide - minimal CPU/RAM impact
+// @version      1.5.0
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -136,6 +136,7 @@
     box.innerHTML = `
       <div id="main">⚡ Measuring...</div>
       <span id="close-btn" title="Close">×</span>
+      <div style="font-size: 10px; opacity: 0.6; margin-top: 4px;">Auto-hide in 10s</div>
       <div id="details">
         <div class="metric">
           <span class="metric-label">DOM Content Loaded:</span>
@@ -159,12 +160,16 @@
     // Đóng UI khi click nút đóng
     box.querySelector('#close-btn').addEventListener('click', (e) => {
       e.stopPropagation();
+      clearTimeout(autoHideTimer);
+      clearInterval(countdownInterval);
       box.remove();
     });
     
     // Mở rộng/Thu gọn khi click
     let isExpanded = false;
     box.addEventListener('click', () => {
+      resetAutoHide(); // Reset timer khi click
+      
       const details = document.getElementById('details');
       if (isExpanded) {
         details.classList.remove('show');
@@ -176,8 +181,14 @@
       isExpanded = !isExpanded;
     });
     
+    // Reset timer khi hover
+    box.addEventListener('mouseenter', resetAutoHide);
+    
     document.body.appendChild(box);
     isUICreated = true;
+    
+    // Bắt đầu tự động tắt
+    startAutoHide();
     
     // Cập nhật ngay sau khi tạo UI
     updateDisplay();
@@ -315,6 +326,59 @@
 🌐 ${window.location.hostname}
 📅 ${new Date().toLocaleTimeString()}`);
     });
+  }
+  
+  // ===== TỰ ĐỘNG TẮT =====
+  let autoHideTimer;
+  let countdownInterval;
+  let countdownElement;
+  
+  function startAutoHide() {
+    let countdown = 10;
+    
+    // Cập nhật countdown display
+    countdownElement = document.querySelector('#speed-box div[style*="font-size: 10px"]');
+    if (countdownElement) {
+      countdownElement.textContent = `Auto-hide in ${countdown}s`;
+    }
+    
+    countdownInterval = setInterval(() => {
+      countdown--;
+      if (countdownElement) {
+        countdownElement.textContent = `Auto-hide in ${countdown}s`;
+      }
+      
+      if (countdown <= 0) {
+        clearInterval(countdownInterval);
+      }
+    }, 1000);
+    
+    // Tự động ẩn sau 10 giây
+    autoHideTimer = setTimeout(() => {
+      const box = document.getElementById('speed-box');
+      if (box) {
+        clearInterval(countdownInterval);
+        box.style.opacity = '0.3';
+        box.style.transform = 'translateY(-2px) scale(0.95)';
+        
+        // Tự động xóa sau 2 giây nữa
+        setTimeout(() => {
+          if (box && box.parentNode) {
+            box.remove();
+          }
+        }, 2000);
+      }
+    }, 10000); // 10 giây
+  }
+  
+  function resetAutoHide() {
+    if (autoHideTimer) {
+      clearTimeout(autoHideTimer);
+    }
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+    }
+    startAutoHide();
   }
   
 })();
