@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Enhanced userscript to mark visited links with custom colors and improved performance
-// @version      0.3.0
+// @version      0.3.1
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -621,51 +621,46 @@
       
       const notification = document.createElement("div");
       
-      // ES2023 enhanced styling with computed values
-      const notificationStyles = {
-        position: "fixed",
-        top: "20px",
-        right: rightPosition,
-        padding: "15px 20px",
-        borderRadius: "5px",
-        color: "white",
-        fontFamily: "Arial, sans-serif",
-        fontSize: "14px",
-        zIndex: "2147483647",
-        opacity: "0",
-        transition: "opacity 0.3s ease",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "20px",
-        lineHeight: "1.4",
-        pointerEvents: "none",
-        background: type === "success" ? "#4CAF50" : type === "error" ? "#f44336" : "#2196F3",
-        boxShadow: "0 2px 10px rgba(0, 0, 0, 0.2)"
-      };
-
-      // Apply styles using ES2023 Object.assign
-      Object.assign(notification.style, 
-        Object.fromEntries(
-          Object.entries(notificationStyles).map(([key, value]) => [key, `${value} !important`])
-        )
-      );
+      // Simplified notification styling - fix for ES2023 compatibility
+      const bgColor = type === "success" ? "#4CAF50" : type === "error" ? "#f44336" : "#2196F3";
+      
+      notification.style.cssText = `
+        position: fixed !important;
+        top: 20px !important;
+        right: ${rightPosition} !important;
+        padding: 15px 20px !important;
+        border-radius: 5px !important;
+        color: white !important;
+        font-family: Arial, sans-serif !important;
+        font-size: 14px !important;
+        z-index: 2147483647 !important;
+        opacity: 0 !important;
+        transition: opacity 0.3s ease !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 20px !important;
+        line-height: 1.4 !important;
+        pointer-events: none !important;
+        background: ${bgColor} !important;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
+      `;
 
       notification.textContent = message;
       document.body.appendChild(notification);
 
-      // ES2023 enhanced animation with queueMicrotask
-      queueMicrotask(() => {
+      // Show notification with requestAnimationFrame for better compatibility
+      requestAnimationFrame(() => {
         notification.style.setProperty("opacity", "1", "important");
       });
 
-      // Auto remove with ES2023 enhanced timing
-      const removeNotification = () => {
+      // Auto remove notification
+      setTimeout(() => {
         notification.style.setProperty("opacity", "0", "important");
-        setTimeout(() => notification.remove(), 300);
-      };
-      
-      setTimeout(removeNotification, 3000);
+        setTimeout(() => {
+          notification.remove();
+        }, 300);
+      }, 3000);
     },
 
     manageExceptions() {
