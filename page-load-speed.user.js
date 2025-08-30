@@ -1,15 +1,13 @@
 // ==UserScript==
 // @name         Page Load Speed Monitor
 // @namespace    com.userscript.page-load-speed
-// @description  Ultra-lightweight page load speed monitor with minimal UI - maximum performance, zero animations
-// @version      1.8.0
+// @description  Minimal page load speed monitor - ultra-fast, zero bloat
+// @version      1.9.0
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
 // @icon         ⚡
 // @run-at       document-start
-// @grant        GM_addStyle
-// @grant        GM_registerMenuCommand
 // @compatible   ScriptCat
 // @compatible   Tampermonkey
 // @compatible   Greasemonkey
@@ -63,7 +61,6 @@
         z-index: 9999999;
         border: 1px solid #333;
         cursor: pointer;
-        user-select: none;
       }
       #speed-box.expanded {
         min-width: 240px;
@@ -75,15 +72,6 @@
         cursor: pointer;
         font-weight: bold;
         color: #ff6b6b;
-      }
-      #info-btn {
-        float: right;
-        margin-left: 6px;
-        cursor: pointer;
-        opacity: 0.8;
-      }
-      #info-btn:hover {
-        opacity: 1 !important;
       }
       #details {
         display: none;
@@ -104,15 +92,6 @@
       .metric-label {
         opacity: 0.9;
       }
-      #info-panel {
-        display: none;
-        margin-top: 8px;
-        padding: 6px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 4px;
-        font-size: 10px;
-        line-height: 1.3;
-      }
     `;
     
     const style = document.createElement('style');
@@ -131,36 +110,24 @@
     box.id = 'speed-box';
     box.innerHTML = `
       <div id="main">⚡ Measuring...</div>
-      <span id="close-btn" title="Close">×</span>
-      <span id="info-btn" title="Show metrics info">ℹ️</span>
+      <span id="close-btn">×</span>
       <div style="font-size: 10px; opacity: 0.6; margin-top: 4px;">Auto-hide in 10s</div>
       <div id="details">
         <div class="metric">
-          <span class="metric-label" title="Time until DOM is fully loaded and parsed">DOM Content Loaded:</span>
+          <span>DOM Content Loaded:</span>
           <span id="dcl-time">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label" title="Time of first pixel painted on screen">First Paint:</span>
+          <span>First Paint:</span>
           <span id="fp-time">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label" title="Time when first content (text/image) becomes visible">First Contentful Paint:</span>
+          <span>First Contentful Paint:</span>
           <span id="fcp-time">-</span>
         </div>
         <div class="metric">
-          <span class="metric-label" title="Time when largest content element becomes visible">Largest Contentful Paint:</span>
+          <span>Largest Contentful Paint:</span>
           <span id="lcp-time">-</span>
-        </div>
-      </div>
-      <div id="info-panel" style="display: none; margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 6px; font-size: 10px; line-height: 1.4;">
-        <div style="font-weight: bold; margin-bottom: 6px;">📊 Performance Metrics:</div>
-        <div>• <b>Total Load Time:</b> Complete page load duration</div>
-        <div>• <b>DOM Content Loaded:</b> HTML parsed, DOM ready</div>
-        <div>• <b>First Paint:</b> First visual change on screen</div>
-        <div>• <b>First Contentful Paint:</b> First meaningful content visible</div>
-        <div>• <b>Largest Contentful Paint:</b> Largest element visible (Core Web Vital)</div>
-        <div style="margin-top: 6px; font-size: 9px; opacity: 0.7;">
-          🟢 Good: Fast loading | 🟡 Medium: Acceptable | 🔴 Poor: Needs improvement
         </div>
       </div>
     `;
@@ -173,39 +140,18 @@
       box.remove();
     });
     
-    // Info button to show metrics info
-    const infoBtn = box.querySelector('#info-btn');
-    infoBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      resetAutoHide();
-      
-      const infoPanel = document.getElementById('info-panel');
-      const details = document.getElementById('details');
-      const isVisible = infoPanel.style.display === 'block';
-      
-      // Toggle info display
-      infoPanel.style.display = isVisible ? 'none' : 'block';
-      
-      if (!isVisible) {
-        details.classList.add('show');
-        box.classList.add('expanded');
-      }
-    });
-    
     // Expand/collapse on click
     let isExpanded = false;
     box.addEventListener('click', (e) => {
-      // Skip if clicking close or info button
-      if (e.target.id === 'close-btn' || e.target.id === 'info-btn') return;
+      // Skip if clicking close button
+      if (e.target.id === 'close-btn') return;
       
       resetAutoHide(); // Reset timer on click
       
       const details = document.getElementById('details');
-      const infoPanel = document.getElementById('info-panel');
       
       if (isExpanded) {
         details.classList.remove('show');
-        infoPanel.style.display = 'none';
         box.classList.remove('expanded');
       } else {
         details.classList.add('show');
@@ -337,24 +283,6 @@
     setTimeout(updateDisplay, 500);
     setTimeout(updateDisplay, 1500);
   });
-  
-  // Performance report menu
-  if (typeof GM_registerMenuCommand !== 'undefined') {
-    GM_registerMenuCommand('📊 Performance Report', () => {
-      const timings = getPageTimings();
-      
-      alert(`🚀 PERFORMANCE REPORT:
-      
-⏱️ Total Load Time: ${timings.loadTime}ms
-📄 DOM Content Loaded: ${timings.dcl}ms
-🖼️ First Paint: ${timings.fp}ms
-🖌️ First Contentful Paint: ${timings.fcp}ms
-📸 Largest Contentful Paint: ${lcpTime}ms
-
-🌐 ${window.location.hostname}
-📅 ${new Date().toLocaleTimeString()}`);
-    });
-  }
   
   // ===== AUTO HIDE =====
   let autoHideTimer;
