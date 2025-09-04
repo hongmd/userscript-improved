@@ -1,21 +1,19 @@
 // ==UserScript==
-// @name        Reject ServiceWorker Auto (Improved)
+// @name        Reject ServiceWorker Auto (Clean)
 // @namespace   rejectserviceWorkerAuto
 // @match       *://*/*
 // @run-at      document-start
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_registerMenuCommand
-// @version     1.4
+// @version     1.5
 // @author      hongmd (improved)
-// @description Automatically blocks ServiceWorker registration on all websites. Optimized for Firefox with better error handling and logging.
+// @description Automatically blocks ServiceWorker registration on all websites. Simple and clean version optimized for Firefox.
 // ==/UserScript==
 
-var defaultvalue = 0; // Changed to number for consistency
 var name = 'rejectserviceWorkerAuto';
 var prefix = "autoinject" + name;
-var value = GM_getValue("value" + name + document.domain, defaultvalue);
-console.log('RSA Script loaded for:', document.domain, 'Value:', value);
+console.log('RSA Script loaded for:', document.domain);
 var injectedStatus = false;
 var hostarray = [];
 
@@ -59,30 +57,34 @@ function addHost() {
 }
 
 function set() {
-    var val = window.prompt("Enter " + name + " value for " + document.domain + " (number)", value.toString());
-    if (val === null) return false; // User cancelled
+    var currentHostname = location.hostname;
+    var action = confirm("Do you want to add '" + currentHostname + "' to whitelist?\n\nOK = Add to whitelist (disable auto-block)\nCancel = Remove from whitelist (enable auto-block)");
     
-    val = parseInt(val, 10);
-    if (isNaN(val)) {
-        alert("Please enter a valid number");
-        return false;
+    if (action) {
+        // Add to whitelist
+        if (!hostarray.includes(currentHostname)) {
+            addHost();
+            alert("Added '" + currentHostname + "' to whitelist. Reload page to take effect.");
+        } else {
+            alert("'" + currentHostname + "' is already in whitelist.");
+        }
+    } else {
+        // Remove from whitelist
+        if (hostarray.includes(currentHostname)) {
+            removeHost();
+            alert("Removed '" + currentHostname + "' from whitelist. ServiceWorker will be auto-blocked.");
+        } else {
+            alert("'" + currentHostname + "' is not in whitelist.");
+        }
     }
-    GM_setValue("value" + name + document.domain, val);
-    console.log('RSA: Set value for', document.domain, 'to', val);
 }
 
 function plus() {
-    var currentValue = GM_getValue("value" + name + document.domain, defaultvalue);
-    var newValue = (typeof currentValue === 'number' ? currentValue : 0) + 1;
-    GM_setValue("value" + name + document.domain, newValue);
-    console.log('RSA: Increased value for', document.domain, 'to', newValue);
+    // Function removed - no longer needed
 }
 
 function minus() {
-    var currentValue = GM_getValue("value" + name + document.domain, defaultvalue);
-    var newValue = (typeof currentValue === 'number' ? currentValue : 0) - 1;
-    GM_setValue("value" + name + document.domain, newValue);
-    console.log('RSA: Decreased value for', document.domain, 'to', newValue);
+    // Function removed - no longer needed
 }
 
 function removeHost() {
@@ -98,11 +100,7 @@ function removeHost() {
 try {
     hostarray = JSON.parse(GM_getValue(prefix, "[]"));
     
-    if (typeof value === 'number') {
-        GM_registerMenuCommand("RSA: Value +", plus);
-        GM_registerMenuCommand("RSA: Value -", minus);
-    }
-    GM_registerMenuCommand("RSA: Set Value", set);
+    GM_registerMenuCommand("RSA: Manage Whitelist", set);
     
     if (hostarray.includes(location.hostname)) {
         GM_registerMenuCommand("RSA: Manual Inject", inject);
