@@ -6,9 +6,9 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @version     4.2
+// @version     4.7
 // @author      hongmd (improved)
-// @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Added DOWN action confirmation and fixed LEFT (stream) action.
+// @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Fixed division by zero and YouTube navigation issues.
 // @namespace   Violentmonkey Scripts
 // ==/UserScript==
 
@@ -16,6 +16,14 @@
 
 // Constants
 const GUIDE = 'Value: pipe ytdl stream mpv iptv';
+
+/* ACTION EXPLANATIONS:
+ * 📺 pipe (UP) → mpv://mpvy/ → Pipe video to MPV with yt-dlp processing
+ * 📥 ytdl (DOWN) → mpv://ytdl/ → Download video using yt-dlp  
+ * 🌊 stream (LEFT) → mpv://stream/ → Stream video using streamlink
+ * ▶️ mpv (RIGHT) → mpv://play/ → Direct play in MPV player
+ * 📋 iptv → mpv://list/ → Add to IPTV playlist
+ */
 const LIVE_WINDOW_WIDTH = 400;
 const LIVE_WINDOW_HEIGHT = 640;
 const DRAG_THRESHOLD = 50;
@@ -90,34 +98,94 @@ function reloadPage() {
     }
 }
 
+function showActionHelp() {
+    const helpText = `🎮 DRAG DIRECTIONS & ACTIONS:
+
+📺 UP (↑): ${settings.UP}
+   → Pipes video to MPV with yt-dlp processing
+   → Good for: YouTube, complex streams
+
+📥 DOWN (↓): ${settings.DOWN} ${settings.down_confirm ? '(Confirm: ON)' : '(Confirm: OFF)'}
+   → Downloads video using yt-dlp
+   → Good for: Saving videos locally
+
+🌊 LEFT (←): ${settings.LEFT}
+   → Streams video using streamlink
+   → Good for: Twitch, live streams
+
+▶️ RIGHT (→): ${settings.RIGHT}
+   → Direct play in MPV player
+   → Good for: Direct video files
+
+📋 UP-LEFT (↖): list
+   → Adds to IPTV/playlist
+   → Good for: Building playlists
+
+🎯 USAGE:
+1. Hover over a video link
+2. Drag in desired direction
+3. Release to trigger action
+
+🔧 Settings: ${settings.total_direction} directions, HLS: ${hlsdomainArray.length} domains
+
+🐛 TROUBLESHOOTING:
+- Check browser console (F12) for debug logs
+- Make sure links are draggable (script auto-enables)
+- Try dragging further than ${DRAG_THRESHOLD}px
+- Look for "🚀 Drag started" and "⬆️ Executing UP action" logs`;
+
+    alert(helpText);
+}
+
+function testDirections() {
+    console.log('🧪 Testing direction detection:');
+    const tests = [
+        { name: 'UP', start: [100, 100], end: [100, 50] },
+        { name: 'DOWN', start: [100, 100], end: [100, 150] },
+        { name: 'LEFT', start: [100, 100], end: [50, 100] },
+        { name: 'RIGHT', start: [100, 100], end: [150, 100] },
+        { name: 'UP-LEFT', start: [100, 100], end: [50, 50] },
+        { name: 'NO MOVEMENT', start: [100, 100], end: [105, 105] }
+    ];
+    
+    tests.forEach(test => {
+        const direction = getDirection(test.start[0], test.start[1], test.end[0], test.end[1]);
+        console.log(`${test.name}: (${test.start[0]},${test.start[1]}) -> (${test.end[0]},${test.end[1]}) = Direction ${direction}`);
+    });
+}
+
 // Menu commands with improved validation
 function setupMenuCommands() {
-    GM_registerMenuCommand(`↑: ${settings.UP}`, function() {
-        const value = safePrompt(GUIDE, settings.UP);
+    // Help command first
+    GM_registerMenuCommand('❓ Show Action Help', showActionHelp);
+    GM_registerMenuCommand('🧪 Test Directions', testDirections);
+    
+    GM_registerMenuCommand(`📺 UP: ${settings.UP}`, function() {
+        const value = safePrompt(GUIDE + '\n\n↑ UP Action (pipe = stream to MPV with yt-dlp)', settings.UP);
         if (value) {
             updateSetting('UP', value);
             reloadPage();
         }
     });
     
-    GM_registerMenuCommand(`↓: ${settings.DOWN}`, function() {
-        const value = safePrompt(GUIDE, settings.DOWN);
+    GM_registerMenuCommand(`📥 DOWN: ${settings.DOWN}`, function() {
+        const value = safePrompt(GUIDE + '\n\n↓ DOWN Action (ytdl = download with yt-dlp)', settings.DOWN);
         if (value) {
             updateSetting('DOWN', value);
             reloadPage();
         }
     });
     
-    GM_registerMenuCommand(`←: ${settings.LEFT}`, function() {
-        const value = safePrompt(GUIDE, settings.LEFT);
+    GM_registerMenuCommand(`🌊 LEFT: ${settings.LEFT}`, function() {
+        const value = safePrompt(GUIDE + '\n\n← LEFT Action (stream = use streamlink)', settings.LEFT);
         if (value) {
             updateSetting('LEFT', value);
             reloadPage();
         }
     });
     
-    GM_registerMenuCommand(`→: ${settings.RIGHT}`, function() {
-        const value = safePrompt(GUIDE, settings.RIGHT);
+    GM_registerMenuCommand(`▶️ RIGHT: ${settings.RIGHT}`, function() {
+        const value = safePrompt(GUIDE + '\n\n→ RIGHT Action (mpv = direct play)', settings.RIGHT);
         if (value) {
             updateSetting('RIGHT', value);
             reloadPage();
@@ -288,23 +356,23 @@ function executeAction(targetUrl, actionType) {
         urlString = finalUrl;
     }
     
-    // Determine app type
+    // Determine app type and protocol action
     switch (actionType) {
         case 'pipe':
-            app = 'mpvy';
+            app = 'mpvy'; // Pipe video stream to MPV with yt-dlp preprocessing
             break;
         case 'iptv':
-            app = 'list';
+            app = 'list'; // Add to IPTV playlist
             break;
         case 'stream':
-            app = 'stream';
+            app = 'stream'; // Stream using streamlink
             break;
         case 'mpv':
         case 'vid':
-            app = 'play';
+            app = 'play'; // Direct play in MPV
             break;
         default:
-            app = actionType;
+            app = actionType; // Pass through custom actions
     }
     
     // Build final URL
@@ -344,40 +412,55 @@ function getDirection(startX, startY, endX, endY) {
     const deltaX = endX - startX;
     const deltaY = endY - startY;
     
+    console.log('Direction calculation:', {
+        start: [startX, startY],
+        end: [endX, endY],
+        delta: [deltaX, deltaY],
+        threshold: DRAG_THRESHOLD
+    });
+    
     // Check for center (no movement)
     if (Math.abs(deltaX) < DRAG_THRESHOLD && Math.abs(deltaY) < DRAG_THRESHOLD) {
+        console.log('Direction: CENTER (no movement)');
         return DirectionEnum.CENTER;
     }
+    
+    let direction;
     
     if (settings.total_direction === 4) {
         // 4-direction mode
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
-            return deltaX > 0 ? DirectionEnum.RIGHT : DirectionEnum.LEFT;
+            direction = deltaX > 0 ? DirectionEnum.RIGHT : DirectionEnum.LEFT;
         } else {
-            return deltaY > 0 ? DirectionEnum.DOWN : DirectionEnum.UP;
+            direction = deltaY > 0 ? DirectionEnum.DOWN : DirectionEnum.UP;
         }
+        console.log('4-direction mode, result:', direction, direction === DirectionEnum.UP ? '(UP)' : direction === DirectionEnum.DOWN ? '(DOWN)' : direction === DirectionEnum.LEFT ? '(LEFT)' : '(RIGHT)');
     } else {
         // 8-direction mode
         if (deltaX === 0) {
-            return deltaY > 0 ? DirectionEnum.DOWN : DirectionEnum.UP;
-        }
-        
-        const slope = deltaY / deltaX;
-        const absSlope = Math.abs(slope);
-        
-        if (absSlope < 0.4142) { // ~22.5 degrees
-            return deltaX > 0 ? DirectionEnum.RIGHT : DirectionEnum.LEFT;
-        } else if (absSlope > 2.4142) { // ~67.5 degrees
-            return deltaY > 0 ? DirectionEnum.DOWN : DirectionEnum.UP;
+            direction = deltaY > 0 ? DirectionEnum.DOWN : DirectionEnum.UP;
+            console.log('8-direction mode, vertical movement, result:', direction);
         } else {
-            // Diagonal directions
-            if (deltaX > 0) {
-                return deltaY > 0 ? DirectionEnum.DOWN_RIGHT : DirectionEnum.UP_RIGHT;
+            const slope = deltaY / deltaX;
+            const absSlope = Math.abs(slope);
+            
+            if (absSlope < 0.4142) { // ~22.5 degrees
+                direction = deltaX > 0 ? DirectionEnum.RIGHT : DirectionEnum.LEFT;
+            } else if (absSlope > 2.4142) { // ~67.5 degrees
+                direction = deltaY > 0 ? DirectionEnum.DOWN : DirectionEnum.UP;
             } else {
-                return deltaY > 0 ? DirectionEnum.DOWN_LEFT : DirectionEnum.UP_LEFT;
+                // Diagonal directions
+                if (deltaX > 0) {
+                    direction = deltaY > 0 ? DirectionEnum.DOWN_RIGHT : DirectionEnum.UP_RIGHT;
+                } else {
+                    direction = deltaY > 0 ? DirectionEnum.DOWN_LEFT : DirectionEnum.UP_LEFT;
+                }
             }
+            console.log('8-direction mode, slope:', slope, 'result:', direction);
         }
     }
+    
+    return direction;
 }
 
 // Enhanced drag handler
@@ -386,46 +469,95 @@ function attachDragHandler(element) {
     
     attachedElements.add(element);
     
+    // Make sure elements are draggable
+    if (element === document) {
+        // For document, we need to make links draggable
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        const links = node.querySelectorAll ? node.querySelectorAll('a') : [];
+                        links.forEach(link => {
+                            if (link.href && !link.draggable) {
+                                link.draggable = true;
+                                console.log('Made link draggable:', link.href);
+                            }
+                        });
+                        
+                        if (node.tagName === 'A' && node.href && !node.draggable) {
+                            node.draggable = true;
+                            console.log('Made link draggable:', node.href);
+                        }
+                    }
+                });
+            });
+        });
+        
+        observer.observe(document, {
+            childList: true,
+            subtree: true
+        });
+        
+        // Make existing links draggable
+        document.querySelectorAll('a').forEach(link => {
+            if (link.href && !link.draggable) {
+                link.draggable = true;
+                console.log('Made existing link draggable:', link.href);
+            }
+        });
+    }
+    
     element.addEventListener('dragstart', function(event) {
-        console.log('Drag started');
+        console.log('🚀 Drag started on element:', event.target.tagName, event.target.href || event.target.src);
         const startX = event.clientX;
         const startY = event.clientY;
         
+        console.log('Drag start coordinates:', startX, startY);
+        
         const handleDragEnd = function(endEvent) {
+            console.log('🏁 Drag ended');
             const endX = endEvent.clientX;
             const endY = endEvent.clientY;
+            
+            console.log('Drag end coordinates:', endX, endY);
+            
             const direction = getDirection(startX, startY, endX, endY);
             
-            console.log(`Drag direction: ${direction} (${startX},${startY} -> ${endX},${endY})`);
+            console.log(`🎯 Final drag direction: ${direction} (${startX},${startY} -> ${endX},${endY})`);
             console.log('Current settings:', settings);
             
             const targetHref = endEvent.target.href || endEvent.target.src;
             if (!targetHref) {
-                console.warn('No href or src found on target element');
+                console.warn('❌ No href or src found on target element');
                 return;
             }
             
-            console.log('Target URL:', targetHref);
+            console.log('🔗 Target URL:', targetHref);
             
             // Execute action based on direction
             switch (direction) {
                 case DirectionEnum.RIGHT:
+                    console.log('➡️ Executing RIGHT action:', settings.RIGHT);
                     executeAction(targetHref, settings.RIGHT);
                     break;
                 case DirectionEnum.LEFT:
+                    console.log('⬅️ Executing LEFT action:', settings.LEFT);
                     executeAction(targetHref, settings.LEFT);
                     break;
                 case DirectionEnum.UP:
+                    console.log('⬆️ Executing UP action:', settings.UP);
                     executeAction(targetHref, settings.UP);
                     break;
                 case DirectionEnum.DOWN:
+                    console.log('⬇️ Executing DOWN action:', settings.DOWN);
                     executeAction(targetHref, settings.DOWN);
                     break;
                 case DirectionEnum.UP_LEFT:
+                    console.log('↖️ Executing UP_LEFT action: list');
                     executeAction(targetHref, 'list');
                     break;
                 default:
-                    console.log('Direction not mapped to action:', direction);
+                    console.log('❓ Direction not mapped to action:', direction);
             }
             
             // Cleanup
@@ -528,9 +660,9 @@ function setupYouTubeFeatures() {
         GM_registerMenuCommand(label, function() {
             if (persistent) {
                 if (url.includes('m.youtube.com')) {
-                    updateSetting('hh_mobile', true);
+                    GM_setValue('hh_mobile', true);
                 } else if (url.includes('www.youtube.com')) {
-                    updateSetting('hh_mobile', false);
+                    GM_setValue('hh_mobile', false);
                 }
             } else {
                 GM_deleteValue('hh_mobile');
