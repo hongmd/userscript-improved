@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version        2.5.1
+// @version        2.5.2
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -61,8 +61,10 @@
         '/CheckCookie',             // Cookie check pages
         '/robots.txt',              // Robot files
         '/favicon.ico',             // Favicon requests
-        'accounts.google.com',      // Google accounts
-        'accounts.youtube.com'      // YouTube accounts
+        'ogs.google.com',           // Google widgets/apps
+        '/widget/app',              // Google widget apps
+        '/persist_identity',        // YouTube identity persistence
+        'studio.youtube.com/persist_identity' // YouTube Studio identity
       ]
     }
   };
