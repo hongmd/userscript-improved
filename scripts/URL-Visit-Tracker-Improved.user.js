@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version        2.4.2
+// @version        2.4.5
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips
 // @author       hongmd
 // @contributor  Original idea by Chewy
-// @homepage     https://github.com/hongmd/userscript-improved
+// @homepage     https://greasyfork.org/en/scripts/548595-url-visit-tracker-improved
 // @homepageURL  https://github.com/hongmd/userscript-improved
 // @supportURL   https://github.com/hongmd/userscript-improved/issues
 // @license      MIT
@@ -24,14 +24,20 @@
     MAX_URLS_STORED: 10000,         // Massive capacity for extensive tracking
     CLEANUP_THRESHOLD: 12000,       // Cleanup when exceeding this (20% buffer)
     HOVER_DELAY: 200,
-    POLL_INTERVAL: 3000,            // Increased to 3s for better CPU efficiency
+    POLL_INTERVAL: 5000,            // Reduced polling frequency for better performance
     BADGE_POSITION: { right: '14px', bottom: '14px' },
     BADGE_VISIBLE: true,
     DEBUG: false,                   // Set to true to enable debug logging
     // Performance optimizations
     POLLING: {
       PAUSE_WHEN_HIDDEN: true,      // Pause polling timer when tab is hidden
-      SKIP_WHEN_HIDDEN: true        // Skip polling execution when tab is hidden (lighter)
+      SKIP_WHEN_HIDDEN: true,       // Skip polling execution when tab is hidden (lighter)
+      ADAPTIVE: true                // Enable adaptive polling based on activity
+    },
+    // Multi-tab coordination
+    MULTI_TAB: {
+      ENABLED: false,               // Set to true to enable multi-tab cache coordination
+      SYNC_INTERVAL: 10000          // How often to sync cache across tabs (ms)
     },
     // URL normalization options
     NORMALIZE_URL: {
@@ -55,6 +61,7 @@
   let pollTimer = null;
   let lastHref = location.href;
   let lastCheck = Date.now();
+  let activityCount = 0; // Track recent activity for adaptive polling
 
   // In-memory cache for hot path performance
   let dbCache = null;
@@ -184,19 +191,23 @@
   
   function startPolling() {
     if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(directPoll, CONFIG.POLL_INTERVAL);
-    if (CONFIG.DEBUG) {
-      console.log('▶️ Polling started');
+    
+    // Adaptive polling interval based on activity
+    let interval = CONFIG.POLL_INTERVAL;
+    if (CONFIG.POLLING.ADAPTIVE) {
+      // More frequent polling if recent activity, less if idle
+      interval = activityCount > 0 ? Math.max(2000, CONFIG.POLL_INTERVAL / 2) : CONFIG.POLL_INTERVAL * 2;
+      // Decay activity count over time
+      activityCount = Math.max(0, activityCount - 1);
     }
+    
+    pollTimer = setInterval(directPoll, interval);
   }
   
   function stopPolling() {
     if (pollTimer) {
       clearInterval(pollTimer);
       pollTimer = null;
-      if (CONFIG.DEBUG) {
-        console.log('⏹️ Polling stopped');
-      }
     }
   }
 
@@ -225,7 +236,7 @@
     }
   }
 
-  // Smart cleanup to maintain database size
+  // Smart cleanup to maintain database size with performance optimization
   function cleanupOldUrls(db) {
     const urls = Object.keys(db);
     if (urls.length <= CONFIG.MAX_URLS_STORED) return db;
@@ -234,31 +245,42 @@
       console.log(`🧹 Large database cleanup: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
     }
 
-    // Calculate score for each URL (visits * recency)
-    const scored = urls.map(url => {
-      const data = db[url];
-      const recentVisit = data.visits?.[0] ?? 0;  // Optional chaining + nullish coalescing
-      const daysSinceVisit = (Date.now() - recentVisit) / (1000 * 60 * 60 * 24);
-      const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30; // 0-1 based on last 30 days
-      const score = data.count * (1 + recencyScore); // Visits weighted by recency
+    // Use requestIdleCallback for non-blocking cleanup if available
+    const performCleanup = () => {
+      // Calculate score for each URL (visits * recency)
+      const scored = urls.map(url => {
+        const data = db[url];
+        const recentVisit = data.visits?.[0] ?? 0;  // Optional chaining + nullish coalescing
+        const daysSinceVisit = (Date.now() - recentVisit) / (1000 * 60 * 60 * 24);
+        const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30; // 0-1 based on last 30 days
+        const score = data.count * (1 + recencyScore); // Visits weighted by recency
 
-      return { url, score, count: data.count, lastVisit: recentVisit };
-    });
+        return { url, score, count: data.count, lastVisit: recentVisit };
+      });
 
-    // Keep top 10,000 URLs by score - massive capacity
-    scored.sort((a, b) => b.score - a.score);
-    const keepUrls = scored.slice(0, CONFIG.MAX_URLS_STORED);
+      // Keep top 10,000 URLs by score - massive capacity
+      scored.sort((a, b) => b.score - a.score);
+      const keepUrls = scored.slice(0, CONFIG.MAX_URLS_STORED);
 
-    // Use Object.fromEntries for more modern approach (ES2019)
-    const cleanDb = Object.fromEntries(
-      keepUrls.map(({ url }) => [url, db[url]])
-    );
+      // Use Object.fromEntries for more modern approach (ES2019)
+      const cleanDb = Object.fromEntries(
+        keepUrls.map(({ url }) => [url, db[url]])
+      );
 
-    const removedCount = urls.length - keepUrls.length;
-    if (CONFIG.DEBUG) {
-      console.log(`✅ Cleanup complete: Kept ${keepUrls.length} URLs, removed ${removedCount} low-priority URLs`);
+      const removedCount = urls.length - keepUrls.length;
+      return cleanDb;
+    };
+
+    // Use requestIdleCallback for non-blocking cleanup if available
+    if (window.requestIdleCallback && urls.length > 5000) {
+      return new Promise(resolve => {
+        requestIdleCallback(() => {
+          resolve(performCleanup());
+        }, { timeout: 10000 }); // 10s timeout fallback
+      });
+    } else {
+      return performCleanup();
     }
-    return cleanDb;
   }
 
   function shortenNumber(num) {
@@ -293,11 +315,6 @@
     try {
       dbCache = GM_getValue('visitDB', {});
       cacheValid = true;
-      
-      if (CONFIG.DEBUG) {
-        console.log(`💾 DB loaded from storage: ${Object.keys(dbCache).length} URLs`);
-      }
-      
       return dbCache;
     } catch (error) {
       console.warn('Failed to read visit database:', error);
@@ -328,10 +345,6 @@
       
       // Then persist to storage
       GM_setValue('visitDB', db);
-      
-      if (CONFIG.DEBUG) {
-        console.log(`💾 DB saved to storage: ${Object.keys(db).length} URLs`);
-      }
     } catch (error) {
       console.warn('Failed to save visit database:', error);
       // Invalidate cache on save failure
@@ -339,7 +352,9 @@
     }
   }
 
-  // Invalidate cache when external changes might occur
+  // Invalidate cache when external changes might occur (multi-tab coordination)
+  // This function is used when CONFIG.MULTI_TAB.ENABLED is true to ensure
+  // cache consistency across multiple tabs
   function invalidateCache() {
     cacheValid = false;
     // Use setTimeout to prevent race conditions
@@ -650,6 +665,11 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     const newUrl = normalizeUrl(location.href);
     if (newUrl === currentUrl) return;
     
+    // Increment activity counter for adaptive polling
+    if (CONFIG.POLLING.ADAPTIVE) {
+      activityCount = Math.min(10, activityCount + 2); // Cap at 10, add 2 for URL change
+    }
+    
     const now = Date.now();
     const timeSinceLastChange = now - lastUrlChangeTime;
     
@@ -725,7 +745,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     window.addEventListener('popstate', onUrlChange);
     window.addEventListener('hashchange', onUrlChange);
 
-    // Optimized MutationObserver with comprehensive title change detection
+    // Optimized MutationObserver with focused title tracking
     let mutationTimeout = null;
     const mo = new MutationObserver((mutations) => {
       // Throttle mutation processing to avoid spam
@@ -736,19 +756,17 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
         let titleChanged = false;
         
         for (const mutation of mutations) {
-          // Check for title element changes in multiple ways
+          // Only check mutations that could affect title
           if (mutation.type === 'childList') {
             // Case 1: Title element added/removed from head
             const titleInAdded = Array.from(mutation.addedNodes).some(node => 
-              node.nodeName === 'TITLE' || 
-              (node.nodeType === Node.ELEMENT_NODE && node.querySelector('title'))
+              node.nodeName === 'TITLE'
             );
             const titleInRemoved = Array.from(mutation.removedNodes).some(node => 
-              node.nodeName === 'TITLE' || 
-              (node.nodeType === Node.ELEMENT_NODE && node.querySelector('title'))
+              node.nodeName === 'TITLE'
             );
             
-            // Case 2: Text nodes added/removed inside title element
+            // Case 2: Direct title element changes
             if (mutation.target.nodeName === 'TITLE') {
               titleChanged = true;
               if (CONFIG.DEBUG) {
@@ -766,20 +784,14 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
             }
           } 
           
-          // Case 3: Character data changed in title's text nodes
-          else if (mutation.type === 'characterData') {
-            // Check if the text node belongs to title element
-            let parent = mutation.target.parentNode;
-            while (parent && parent.nodeName !== 'TITLE') {
-              parent = parent.parentNode;
+          // Case 3: Character data changed in title's text nodes (more targeted)
+          else if (mutation.type === 'characterData' && 
+                   mutation.target.parentNode?.nodeName === 'TITLE') {
+            titleChanged = true;
+            if (CONFIG.DEBUG) {
+              console.log('📝 Title characterData mutation detected:', mutation);
             }
-            if (parent && parent.nodeName === 'TITLE') {
-              titleChanged = true;
-              if (CONFIG.DEBUG) {
-                console.log('📝 Title characterData mutation detected:', mutation);
-              }
-              break;
-            }
+            break;
           }
         }
         
@@ -789,22 +801,31 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
           }
           onUrlChange();
         }
-      }, 100); // 100ms throttle for mutations
+      }, 150); // Slightly increased debounce for better performance
     });
 
-    // Safely observe document.head with comprehensive title tracking
+    // Safely observe document.head with focused title tracking
     if (document.head) {
       mo.observe(document.head, { 
         childList: true,      // Detect title element addition/removal
-        subtree: true,        // Detect changes in title's children (text nodes)
-        characterData: true   // Detect text content changes in title
+        subtree: false,       // Only direct children for better performance
+        characterData: false  // Handle characterData separately for title only
       });
+      
+      // Separate observer for title content changes
+      const titleEl = document.querySelector('title');
+      if (titleEl) {
+        mo.observe(titleEl, {
+          childList: true,
+          characterData: true,
+          subtree: true
+        });
+      }
     } else {
-      // Fallback: observe document for head creation
+      // Fallback: observe document for head creation (minimal scope)
       mo.observe(document, { 
         childList: true, 
-        subtree: true,
-        characterData: true 
+        subtree: false
       });
     }
 
@@ -926,6 +947,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     }
     pendingTooltipPosition = null;
 
+    // Ensure mousemove listener is properly removed
     document.removeEventListener('mousemove', moveTooltip);
   }
 
@@ -1009,21 +1031,6 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     if (CONFIG.DEBUG) {
       console.log('🐛 Visit Tracker Debug Mode: ENABLED');
-      
-      // Test shortenNumber edge cases in debug mode
-      console.group('🔢 Testing shortenNumber edge cases:');
-      const testCases = [
-        [0, '0'], [1, '1'], [999, '999'], [1000, '1.0K'], [1500, '1.5K'],
-        [999999, '999.9K'], [1000000, '1.0M'], [1500000, '1.5M'],
-        [999999999, '999.9M'], [1000000000, '1.0B'], [1500000000, '1.5B'],
-        [-5, '0'], [NaN, '0'], [Infinity, '0'], [-Infinity, '0'], [1.7, '1']
-      ];
-      testCases.forEach(([input, expected]) => {
-        const result = shortenNumber(input);
-        const status = result === expected ? '✅' : '❌';
-        console.log(`${status} shortenNumber(${input}) = "${result}" (expected: "${expected}")`);
-      });
-      console.groupEnd();
     }
 
     // Don't register menu for initial empty state - let updateVisit() handle it
@@ -1036,26 +1043,31 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
         // Tab became hidden - pause polling if configured
         if (CONFIG.POLLING.PAUSE_WHEN_HIDDEN) {
           stopPolling();
-          if (CONFIG.DEBUG) {
-            console.log('👁️ Tab hidden - polling paused for performance');
-          }
-        } else if (CONFIG.DEBUG) {
-          console.log('👁️ Tab hidden - polling continues but will skip execution');
         }
       } else {
         // Tab became visible - resume polling if it was paused
         if (CONFIG.POLLING.PAUSE_WHEN_HIDDEN && !pollTimer) {
-          startPolling();
-          if (CONFIG.DEBUG) {
-            console.log('👁️ Tab visible - polling resumed');
+          // Boost activity for immediate responsiveness when tab becomes visible
+          if (CONFIG.POLLING.ADAPTIVE) {
+            activityCount = Math.min(10, activityCount + 3);
           }
-        } else if (CONFIG.DEBUG) {
-          console.log('👁️ Tab visible - cache remains valid (single-tab assumption)');
+          startPolling();
         }
-        // Note: We assume single-tab usage. If multi-tab coordination needed,
-        // uncomment next line: invalidateCache();
+        // Multi-tab cache coordination if enabled
+        if (CONFIG.MULTI_TAB.ENABLED) {
+          invalidateCache();
+        }
       }
     }, { passive: true });
+
+    // Multi-tab cache synchronization if enabled
+    if (CONFIG.MULTI_TAB.ENABLED) {
+      setInterval(() => {
+        if (!document.hidden) {
+          invalidateCache();
+        }
+      }, CONFIG.MULTI_TAB.SYNC_INTERVAL);
+    }
   }
 
   // Cleanup pending operations on page unload
@@ -1069,84 +1081,6 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
       }
     }
   });
-
-  // Debug test cases for URL normalization (only runs in debug mode)
-  if (CONFIG.DEBUG) {
-    console.group('🧪 URL Normalization Test Cases');
-    
-    const testUrls = [
-      'https://www.example.com/page?q=search&tab=results#section1',
-      'http://example.com/path/?filter=value',
-      'https://subdomain.site.com/page/',
-      'http://www.google.com/search?q=test+query&source=web',
-      'https://github.com/user/repo/issues?state=open#comment-123'
-    ];
-    
-    testUrls.forEach(testUrl => {
-      const normalized = normalizeUrl(testUrl);
-      console.log(`  "${testUrl}"\n  → "${normalized}"`);
-    });
-    
-    console.log('\n📋 Current normalization settings:');
-    Object.entries(CONFIG.NORMALIZE_URL).forEach(([key, value]) => {
-      console.log(`  ${key}: ${value}`);
-    });
-    
-    console.groupEnd();
-    
-    // Debug polling configuration
-    console.group('🧪 Polling Configuration');
-    console.log('Poll interval:', CONFIG.POLL_INTERVAL + 'ms');
-    console.log('Pause when hidden:', CONFIG.POLLING.PAUSE_WHEN_HIDDEN);
-    console.log('Skip when hidden:', CONFIG.POLLING.SKIP_WHEN_HIDDEN);
-    console.log('Current tab visibility:', document.hidden ? 'hidden' : 'visible');
-    console.log('Polling status:', pollTimer ? 'running' : 'stopped');
-    console.groupEnd();
-    
-    // Debug title change detection
-    console.group('🧪 Title Change Detection Test');
-    console.log('Current title:', document.title);
-    console.log('Title element:', document.querySelector('title'));
-    
-    // Test title change simulation (only if safe to do so)
-    if (location.href.includes('localhost') || location.href.includes('127.0.0.1')) {
-      console.log('🧪 Simulating title changes for testing...');
-      const originalTitle = document.title;
-      
-      setTimeout(() => {
-        document.title = originalTitle + ' [TEST]';
-        console.log('📝 Title changed to:', document.title);
-        
-        setTimeout(() => {
-          document.title = originalTitle;
-          console.log('📝 Title restored to:', document.title);
-        }, 1000);
-      }, 2000);
-    }
-    
-    console.groupEnd();
-    
-    // Debug size calculation comparison
-    console.group('🧪 Database Size Calculation Test');
-    const testDb = getDB();
-    const charCount = JSON.stringify(testDb).length;
-    const byteSize = getActualDataSize(testDb);
-    const ratio = (byteSize / charCount).toFixed(2);
-    
-    console.log(`Character count: ${charCount.toLocaleString()}`);
-    console.log(`Actual UTF-8 bytes: ${byteSize.toLocaleString()}`);
-    console.log(`Bytes per character: ${ratio} (1.0 = pure ASCII, >1.0 = Unicode present)`);
-    console.log(`Size in KB (old method): ${Math.round(charCount / 1024)} KB`);
-    console.log(`Size in KB (accurate): ${Math.round(byteSize / 1024)} KB`);
-    
-    if (byteSize !== charCount) {
-      console.log(`📊 Size difference: ${byteSize - charCount} bytes (${((byteSize / charCount - 1) * 100).toFixed(1)}% larger)`);
-    } else {
-      console.log(`✅ Database contains only ASCII characters`);
-    }
-    
-    console.groupEnd();
-  }
 
   initializeTracker();
 
