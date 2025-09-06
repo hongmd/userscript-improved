@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.9
+// @version      1.9.1
 // @description  Track visits per URL, show corner badge history & link hover info - Improved Performance
 // @match        https://*/*
 // @grant        GM_getValue
@@ -83,29 +83,49 @@
     GM_registerMenuCommand(`Last: ${lastVisit}`, () => { });
     
     GM_registerMenuCommand('📊 Export Data', exportData);
-    GM_registerMenuCommand(' Show Statistics', showStatistics);
+    GM_registerMenuCommand('📈 Show Statistics', showStatistics);
     GM_registerMenuCommand('🗑️ Clear Current Page', clearCurrentPage);
     GM_registerMenuCommand('💥 Clear All Data', clearAllData);
   }
 
   function exportData() {
-    const db = getDB();
-    const dataStr = JSON.stringify(db, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `visit-tracker-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const db = getDB();
+      const dataStr = JSON.stringify(db, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `visit-tracker-${new Date().toISOString().split('T')[0]}.json`;
+      
+      // Safely append to DOM
+      if (document.body) {
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        // Fallback for early DOM state
+        a.click();
+      }
+      
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export data: ' + error.message);
+    }
   }
 
   function showStatistics() {
     const db = getDB();
     const urls = Object.keys(db);
     const totalUrls = urls.length;
+    
+    // Handle empty database
+    if (totalUrls === 0) {
+      alert('📈 Visit Tracker Statistics\n\n🌐 No websites tracked yet!\n\nStart browsing to collect visit data.');
+      return;
+    }
+    
     const totalVisits = urls.reduce((sum, url) => sum + db[url].count, 0);
     
     // Find most visited site
@@ -281,7 +301,14 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
         }
       }
     });
-    mo.observe(document.head, { childList: true, subtree: true });
+    
+    // Safely observe document.head
+    if (document.head) {
+      mo.observe(document.head, { childList: true, subtree: true });
+    } else {
+      // Fallback: observe document for head creation
+      mo.observe(document, { childList: true, subtree: true });
+    }
     
     // Reduced polling frequency and added debounce
     let lastHref = location.href;
@@ -314,7 +341,15 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
     opacity: 0;
     transition: opacity 0.15s ease;
   `;
-  document.body.appendChild(tooltip);
+  
+  // Safely append tooltip to DOM
+  if (document.body) {
+    document.body.appendChild(tooltip);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.appendChild(tooltip);
+    });
+  }
 
   let hoverTimer;
   let currentHoveredLink = null;
