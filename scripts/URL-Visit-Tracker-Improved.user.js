@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.9.3
-// @description  Track visits per URL, show corner badge history & link hover info - Improved Performance & Storage
+// @version      1.9.5
+// @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @match        https://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -15,8 +15,8 @@
   // Configuration options
   const CONFIG = {
     MAX_VISITS_STORED: 20,
-    MAX_URLS_STORED: 300,           // Limit total URLs to prevent bloat
-    CLEANUP_THRESHOLD: 350,         // Cleanup when exceeding this
+    MAX_URLS_STORED: 10000,         // Massive capacity for extensive tracking
+    CLEANUP_THRESHOLD: 12000,       // Cleanup when exceeding this (20% buffer)
     HOVER_DELAY: 200,
     POLL_INTERVAL: 2000,
     DEBOUNCE_DELAY: 1500,
@@ -50,7 +50,7 @@
     const urls = Object.keys(db);
     if (urls.length <= CONFIG.MAX_URLS_STORED) return db;
     
-    console.log(`Cleaning up database: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
+    console.log(`🧹 Large database cleanup: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
     
     // Calculate score for each URL (visits * recency)
     const scored = urls.map(url => {
@@ -63,7 +63,7 @@
       return { url, score, count: data.count, lastVisit: recentVisit };
     });
     
-    // Keep top URLs by score
+    // Keep top 10,000 URLs by score - massive capacity
     scored.sort((a, b) => b.score - a.score);
     const keepUrls = scored.slice(0, CONFIG.MAX_URLS_STORED);
     
@@ -72,7 +72,8 @@
       cleanDb[item.url] = db[item.url];
     });
     
-    console.log(`Cleanup complete: Kept ${keepUrls.length} top URLs`);
+    const removedCount = urls.length - keepUrls.length;
+    console.log(`✅ Cleanup complete: Kept ${keepUrls.length} URLs, removed ${removedCount} low-priority URLs`);
     return cleanDb;
   }
 
