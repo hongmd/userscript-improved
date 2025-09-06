@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version        2.5.0
+// @version        2.5.1
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -49,7 +49,8 @@
                                     // false: tracks different sections separately
       REMOVE_WWW: true,             // Set to true to remove www. prefix
       REMOVE_PROTOCOL: true,        // Set to true to remove http/https
-      REMOVE_TRAILING_SLASH: true   // Set to true to remove trailing /
+      REMOVE_TRAILING_SLASH: true,  // Set to true to remove trailing /
+      CLEAN_SEARCH_URLS: true       // Clean search engine URLs (keep only main query)
     },
     // URL filtering - Skip tracking certain types of URLs
     URL_FILTERS: {
@@ -101,6 +102,11 @@
       return normalizeUrl(location.href);
     }
     
+    // Clean search URLs before other normalizations (must be done first)
+    if (CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS) {
+      normalized = cleanSearchUrl(normalized);
+    }
+    
     // Remove protocol if configured
     if (CONFIG.NORMALIZE_URL.REMOVE_PROTOCOL) {
       normalized = normalized.replace(/^https?:\/\//, '');
@@ -121,7 +127,7 @@
       normalized = normalized.split('#')[0];
     }
     
-    // Remove query parameters if configured
+    // Remove query parameters if configured (after search cleaning)
     if (CONFIG.NORMALIZE_URL.REMOVE_QUERY) {
       normalized = normalized.split('?')[0];
     }
@@ -150,6 +156,73 @@
     }
     
     return false;
+  }
+
+  // Clean search engine URLs to group similar searches
+  function cleanSearchUrl(url) {
+    if (!CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS) return url;
+    
+    try {
+      const urlObj = new URL(url.startsWith('http') ? url : 'https://' + url);
+      const hostname = urlObj.hostname.toLowerCase();
+      const pathname = urlObj.pathname;
+      const searchParams = new URLSearchParams(urlObj.search);
+      
+      // Google Search
+      if ((hostname.includes('google.') || hostname === 'google.com') && pathname.includes('/search')) {
+        const query = searchParams.get('q');
+        if (query) {
+          // Keep only the main query, remove tracking params
+          const cleanUrl = `${urlObj.protocol}//${urlObj.hostname}${pathname}?q=${encodeURIComponent(query)}`;
+          if (CONFIG.DEBUG) {
+            console.log(`🔍 Cleaned Google search: "${url}" → "${cleanUrl}"`);
+          }
+          return cleanUrl;
+        }
+      }
+      
+      // Bing Search
+      else if (hostname.includes('bing.com') && pathname.includes('/search')) {
+        const query = searchParams.get('q');
+        if (query) {
+          const cleanUrl = `${urlObj.protocol}//${urlObj.hostname}${pathname}?q=${encodeURIComponent(query)}`;
+          if (CONFIG.DEBUG) {
+            console.log(`🔍 Cleaned Bing search: "${url}" → "${cleanUrl}"`);
+          }
+          return cleanUrl;
+        }
+      }
+      
+      // DuckDuckGo Search
+      else if (hostname.includes('duckduckgo.com')) {
+        const query = searchParams.get('q');
+        if (query) {
+          const cleanUrl = `${urlObj.protocol}//${urlObj.hostname}/?q=${encodeURIComponent(query)}`;
+          if (CONFIG.DEBUG) {
+            console.log(`🔍 Cleaned DuckDuckGo search: "${url}" → "${cleanUrl}"`);
+          }
+          return cleanUrl;
+        }
+      }
+      
+      // YouTube Search
+      else if (hostname.includes('youtube.com') && pathname.includes('/results')) {
+        const query = searchParams.get('search_query');
+        if (query) {
+          const cleanUrl = `${urlObj.protocol}//${urlObj.hostname}${pathname}?search_query=${encodeURIComponent(query)}`;
+          if (CONFIG.DEBUG) {
+            console.log(`🔍 Cleaned YouTube search: "${url}" → "${cleanUrl}"`);
+          }
+          return cleanUrl;
+        }
+      }
+    } catch (error) {
+      if (CONFIG.DEBUG) {
+        console.warn('Failed to clean search URL:', error);
+      }
+    }
+    
+    return url; // Return original if not a search URL or parsing failed
   }
 
   // Safe closest() that handles Text nodes and elements without closest method
@@ -444,8 +517,9 @@
     GM_registerMenuCommand('📈 Show Statistics', showStatistics);
     GM_registerMenuCommand('🗑️ Clear Current Page', clearCurrentPage);
     GM_registerMenuCommand('💥 Clear All Data', clearAllData);
-    GM_registerMenuCommand('� Toggle URL Filtering', toggleUrlFiltering);
-    GM_registerMenuCommand('�🐛 Toggle Debug Mode', toggleDebugMode);
+    GM_registerMenuCommand('🚫 Toggle URL Filtering', toggleUrlFiltering);
+    GM_registerMenuCommand('🔍 Toggle Search URL Cleaning', toggleSearchCleaning);
+    GM_registerMenuCommand('🐛 Toggle Debug Mode', toggleDebugMode);
   }
 
   function exportData() {
@@ -689,6 +763,20 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     const status = CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES ? 'enabled' : 'disabled';
     alert(`🚫 URL Filtering ${status}!\n\nUtility pages (cookies, auth, etc.) filtering is now ${status}.`);
+  }
+
+  function toggleSearchCleaning() {
+    CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = !CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS;
+
+    // Save state to GM storage
+    try {
+      GM_setValue('searchCleaning', CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS);
+    } catch (error) {
+      console.warn('Failed to save search cleaning state:', error);
+    }
+
+    const status = CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS ? 'enabled' : 'disabled';
+    alert(`🔍 Search URL Cleaning ${status}!\n\nSearch URLs will now ${CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS ? 'be cleaned (grouped by query)' : 'be tracked as-is (separate tracking)'}.`);
   }
 
   function toggleDebugMode() {
@@ -1097,6 +1185,14 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     } catch (error) {
       console.warn('Failed to load URL filtering state:', error);
       CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = true;
+    }
+
+    // Load saved search cleaning state
+    try {
+      CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = GM_getValue('searchCleaning', CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS);
+    } catch (error) {
+      console.warn('Failed to load search cleaning state:', error);
+      CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = true;
     }
 
     if (CONFIG.DEBUG) {
