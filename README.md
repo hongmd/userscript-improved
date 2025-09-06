@@ -218,4 +218,17 @@ This project is open source. See individual script headers for specific licensin
 
 ---
 
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### What this means:
+- ✅ **Free to use** - Personal and commercial use allowed
+- ✅ **Modify freely** - Change code to fit your needs
+- ✅ **Distribute** - Share with others or publish modifications
+- ✅ **No warranty** - Use at your own risk
+- ⚠️ **Keep copyright** - Include original license notice
+
+---
+
 **⭐ Star this repo if these userscripts help improve your browsing experience!**
