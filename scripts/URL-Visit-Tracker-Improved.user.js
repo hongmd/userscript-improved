@@ -1,11 +1,10 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      2.0.0
+// @version      2.0.1
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @author       hongmd
 // @contributor  Original idea by Chewy
-// @homepage     https://github.com/hongmd/userscript-improved
 // @homepageURL  https://github.com/hongmd/userscript-improved
 // @supportURL   https://github.com/hongmd/userscript-improved/issues
 // @match        https://*/*
@@ -568,8 +567,6 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
 
   // Initialize the tracker
   function initializeTracker() {
-    const db = getDB();
-    
     // Load saved badge visibility state
     try {
       badgeVisible = GM_getValue('badgeVisible', CONFIG.BADGE_VISIBLE);
