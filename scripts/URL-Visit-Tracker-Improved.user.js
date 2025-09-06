@@ -4,6 +4,7 @@
 // @version      1.9.9
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @author       hongmd
+// @contributor  Original idea by Chewy
 // @homepage     https://github.com/hongmd/userscript-improved
 // @homepageURL  https://github.com/hongmd/userscript-improved
 // @supportURL   https://github.com/hongmd/userscript-improved/issues
@@ -17,6 +18,21 @@
 
 (function () {
   'use strict';
+
+  /*
+   * URL Visit Tracker (Improved)
+   * 
+   * Credits:
+   * - Original concept and idea by Chewy
+   * - Enhanced and optimized by hongmd
+   * 
+   * This script builds upon the original vision while adding:
+   * - Massive capacity (10K URLs) with smart cleanup
+   * - Toggle badge visibility with smooth animations  
+   * - RequestAnimationFrame tooltip movement
+   * - Advanced storage optimization and performance
+   * - Production-ready error handling and edge cases
+   */
 
   // Configuration options
   const CONFIG = {
