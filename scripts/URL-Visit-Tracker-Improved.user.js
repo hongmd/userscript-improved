@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version        2.4.5
+// @version        2.5.0
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -50,6 +50,19 @@
       REMOVE_WWW: true,             // Set to true to remove www. prefix
       REMOVE_PROTOCOL: true,        // Set to true to remove http/https
       REMOVE_TRAILING_SLASH: true   // Set to true to remove trailing /
+    },
+    // URL filtering - Skip tracking certain types of URLs
+    URL_FILTERS: {
+      SKIP_UTILITY_PAGES: true,     // Skip tracking utility/internal pages (cookies, auth, etc.)
+      SKIP_PATTERNS: [              // URL patterns to skip (case-insensitive)
+        '/RotateCookiesPage',       // YouTube cookie rotation
+        '/ServiceLogin',            // Google login pages
+        '/CheckCookie',             // Cookie check pages
+        '/robots.txt',              // Robot files
+        '/favicon.ico',             // Favicon requests
+        'accounts.google.com',      // Google accounts
+        'accounts.youtube.com'      // YouTube accounts
+      ]
     }
   };
 
@@ -118,6 +131,25 @@
     }
     
     return normalized;
+  }
+
+  // Check if URL should be skipped from tracking
+  function shouldSkipUrl(url) {
+    if (!CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES) return false;
+    
+    const urlLower = url.toLowerCase();
+    
+    // Check against skip patterns
+    for (const pattern of CONFIG.URL_FILTERS.SKIP_PATTERNS) {
+      if (urlLower.includes(pattern.toLowerCase())) {
+        if (CONFIG.DEBUG) {
+          console.log(`🚫 Skipping URL (matches pattern "${pattern}"): ${url}`);
+        }
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   // Safe closest() that handles Text nodes and elements without closest method
@@ -267,7 +299,6 @@
         keepUrls.map(({ url }) => [url, db[url]])
       );
 
-      const removedCount = urls.length - keepUrls.length;
       return cleanDb;
     };
 
@@ -364,6 +395,14 @@
   }  let currentUrl = normalizeUrl(location.href);
 
   function updateVisit() {
+    // Skip tracking if current URL matches filter patterns
+    if (shouldSkipUrl(location.href)) {
+      if (CONFIG.DEBUG) {
+        console.log(`🚫 Skipping visit tracking: ${location.href}`);
+      }
+      return;
+    }
+    
     const db = getDB();
     const now = new Date();
     const timestamp = createTimestamp(now);
@@ -405,7 +444,8 @@
     GM_registerMenuCommand('📈 Show Statistics', showStatistics);
     GM_registerMenuCommand('🗑️ Clear Current Page', clearCurrentPage);
     GM_registerMenuCommand('💥 Clear All Data', clearAllData);
-    GM_registerMenuCommand('🐛 Toggle Debug Mode', toggleDebugMode);
+    GM_registerMenuCommand('� Toggle URL Filtering', toggleUrlFiltering);
+    GM_registerMenuCommand('�🐛 Toggle Debug Mode', toggleDebugMode);
   }
 
   function exportData() {
@@ -637,6 +677,20 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     }
   }
 
+  function toggleUrlFiltering() {
+    CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = !CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES;
+
+    // Save state to GM storage
+    try {
+      GM_setValue('urlFiltering', CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES);
+    } catch (error) {
+      console.warn('Failed to save URL filtering state:', error);
+    }
+
+    const status = CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES ? 'enabled' : 'disabled';
+    alert(`🚫 URL Filtering ${status}!\n\nUtility pages (cookies, auth, etc.) filtering is now ${status}.`);
+  }
+
   function toggleDebugMode() {
     CONFIG.DEBUG = !CONFIG.DEBUG;
 
@@ -664,6 +718,14 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   function onUrlChange() {
     const newUrl = normalizeUrl(location.href);
     if (newUrl === currentUrl) return;
+    
+    // Skip tracking if URL matches filter patterns
+    if (shouldSkipUrl(location.href)) {
+      if (CONFIG.DEBUG) {
+        console.log(`🚫 Skipping URL tracking: ${location.href}`);
+      }
+      return;
+    }
     
     // Increment activity counter for adaptive polling
     if (CONFIG.POLLING.ADAPTIVE) {
@@ -1027,6 +1089,14 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     } catch (error) {
       console.warn('Failed to load debug mode state:', error);
       CONFIG.DEBUG = false;
+    }
+
+    // Load saved URL filtering state
+    try {
+      CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = GM_getValue('urlFiltering', CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES);
+    } catch (error) {
+      console.warn('Failed to load URL filtering state:', error);
+      CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = true;
     }
 
     if (CONFIG.DEBUG) {
