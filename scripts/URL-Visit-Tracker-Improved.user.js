@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.9.6
+// @version      1.9.7
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @match        https://*/*
 // @grant        GM_getValue
@@ -23,6 +23,9 @@
     BADGE_POSITION: { right: '14px', bottom: '14px' },
     BADGE_VISIBLE: true
   };
+
+  // Badge visibility state
+  let badgeVisible = CONFIG.BADGE_VISIBLE;
 
   function normalizeUrl(url) {
     // Remove protocol, www, trailing slash, and fragments for better compression
@@ -137,6 +140,9 @@
         GM_registerMenuCommand(`Last: ${lastVisit}`, () => { });
       }
     }
+    
+    // Toggle badge visibility menu
+    GM_registerMenuCommand(badgeVisible ? '👁️ Hide Badge' : '👁️ Show Badge', toggleBadgeVisibility);
     
     GM_registerMenuCommand('📊 Export Data', exportData);
     GM_registerMenuCommand('📈 Show Statistics', showStatistics);
@@ -259,10 +265,17 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
     const css = `
       .vt-badge {
         position: fixed;
-        right: 14px;
-        bottom: 14px;
+        right: ${CONFIG.BADGE_POSITION.right};
+        bottom: ${CONFIG.BADGE_POSITION.bottom};
         z-index: 2147483647;
         font-family: system-ui, sans-serif;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .vt-badge.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: scale(0.8);
       }
       .vt-link {
         display: inline-block;
@@ -273,6 +286,7 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
         font-size: 12px;
         box-shadow: 0 4px 14px rgba(0,0,0,0.2);
         opacity: 0.85;
+        transition: opacity 0.2s ease;
       }
       .vt-badge:hover .vt-link { opacity: 1; }
       .vt-tooltip {
@@ -315,7 +329,22 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
         <a class="vt-link" href="javascript:void(0)"></a>
         <div class="vt-tooltip"></div>
       `;
+      
+      // Add click handler for toggle visibility
+      badge.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleBadgeVisibility();
+      });
+      
       document.documentElement.appendChild(badge);
+    }
+
+    // Apply visibility state
+    if (!badgeVisible) {
+      badge.classList.add('hidden');
+    } else {
+      badge.classList.remove('hidden');
     }
 
     badge.querySelector('.vt-link').textContent = `Visit: ${shortenNumber(data.count)}`;
@@ -331,6 +360,25 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       });
     } else {
       tooltip.innerHTML += `<span class="vt-line">No visit history</span>`;
+    }
+  }
+
+  function toggleBadgeVisibility() {
+    badgeVisible = !badgeVisible;
+    const badge = document.getElementById('vt-hover-badge');
+    if (badge) {
+      if (badgeVisible) {
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+    
+    // Save state to GM storage
+    try {
+      GM_setValue('badgeVisible', badgeVisible);
+    } catch (error) {
+      console.warn('Failed to save badge visibility state:', error);
     }
   }
 
@@ -475,6 +523,14 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
   // Initialize the tracker
   function initializeTracker() {
     const db = getDB();
+    
+    // Load saved badge visibility state
+    try {
+      badgeVisible = GM_getValue('badgeVisible', CONFIG.BADGE_VISIBLE);
+    } catch (error) {
+      console.warn('Failed to load badge visibility state:', error);
+      badgeVisible = CONFIG.BADGE_VISIBLE;
+    }
     
     // Don't register menu for initial empty state - let updateVisit() handle it
     updateVisit();
