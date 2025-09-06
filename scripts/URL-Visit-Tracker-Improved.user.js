@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.9.1
-// @description  Track visits per URL, show corner badge history & link hover info - Improved Performance
+// @version      2.0.0
+// @description  Track visits per URL, show corner badge history & link hover info - Optimized Storage
 // @match        https://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
@@ -31,14 +31,89 @@
     return `${pad(date.getHours())}:${pad(date.getMinutes())} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
   }
 
+  function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    const pad = n => n.toString().padStart(2, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  }
+
+  function storeTimestamp(date) {
+    return date.getTime();
+  }
+
   function shortenNumber(num) {
     if (num >= 1000) return (Math.round(num / 100) / 10) + 'k';
     return String(num);
   }
 
+  // Domain mapping for URL compression
+  function getDomainMap() {
+    try {
+      return GM_getValue('domainMap', {});
+    } catch (error) {
+      console.warn('Failed to read domain map:', error);
+      return {};
+    }
+  }
+
+  function setDomainMap(map) {
+    try {
+      GM_setValue('domainMap', map);
+    } catch (error) {
+      console.warn('Failed to save domain map:', error);
+    }
+  }
+
+  function compressUrl(url) {
+    const parts = url.split('/');
+    const domain = parts[0];
+    const path = parts.slice(1).join('/');
+    
+    const domainMap = getDomainMap();
+    
+    if (!domainMap[domain]) {
+      // Create new domain ID
+      const domainIds = Object.values(domainMap);
+      const nextId = domainIds.length > 0 ? Math.max(...domainIds) + 1 : 1;
+      domainMap[domain] = nextId;
+      setDomainMap(domainMap);
+    }
+    
+    return path ? `${domainMap[domain]}/${path}` : `${domainMap[domain]}`;
+  }
+
+  function decompressUrl(compressedUrl) {
+    const domainMap = getDomainMap();
+    const reverseDomainMap = {};
+    
+    // Create reverse mapping
+    for (const [domain, id] of Object.entries(domainMap)) {
+      reverseDomainMap[id] = domain;
+    }
+    
+    const parts = compressedUrl.split('/');
+    const domainId = parseInt(parts[0]);
+    const path = parts.slice(1).join('/');
+    
+    const domain = reverseDomainMap[domainId];
+    return path ? `${domain}/${path}` : domain;
+  }
+
   function getDB() {
     try {
-      return GM_getValue('visitDB', {});
+      const compressedDB = GM_getValue('visitDB', {});
+      const decompressedDB = {};
+      
+      // Decompress URLs and timestamps
+      for (const [compressedUrl, data] of Object.entries(compressedDB)) {
+        const originalUrl = decompressUrl(compressedUrl);
+        decompressedDB[originalUrl] = {
+          count: data.count,
+          visits: data.visits.map(timestamp => formatTimestamp(timestamp))
+        };
+      }
+      
+      return decompressedDB;
     } catch (error) {
       console.warn('Failed to read visit database:', error);
       return {};
@@ -47,7 +122,28 @@
 
   function setDB(db) {
     try {
-      GM_setValue('visitDB', db);
+      const compressedDB = {};
+      
+      // Compress URLs and timestamps
+      for (const [originalUrl, data] of Object.entries(db)) {
+        const compressedUrl = compressUrl(originalUrl);
+        compressedDB[compressedUrl] = {
+          count: data.count,
+          visits: data.visits.map(visitStr => {
+            // Convert string back to timestamp if needed
+            if (typeof visitStr === 'string') {
+              // Parse the formatted date string back to timestamp
+              const [time, date] = visitStr.split(' ');
+              const [hours, minutes] = time.split(':').map(Number);
+              const [day, month, year] = date.split('/').map(Number);
+              return new Date(year, month - 1, day, hours, minutes).getTime();
+            }
+            return visitStr; // Already a timestamp
+          })
+        };
+      }
+      
+      GM_setValue('visitDB', compressedDB);
     } catch (error) {
       console.warn('Failed to save visit database:', error);
     }
@@ -55,10 +151,76 @@
 
   let currentUrl = normalizeUrl(location.href);
 
+  // Migration function for old data format
+  function migrateOldData() {
+    try {
+      const oldDB = GM_getValue('visitDB', {});
+      const oldDomainMap = GM_getValue('domainMap', {});
+      
+      // Check if migration is needed (old format detection)
+      const needsMigration = Object.keys(oldDB).some(key => {
+        return key.includes('.') || // Contains domain
+               (oldDB[key].visits && oldDB[key].visits.some(visit => 
+                 typeof visit === 'string' && visit.includes(':')
+               ));
+      });
+      
+      if (needsMigration) {
+        console.log('Migrating visit data to optimized format...');
+        
+        // Convert old format to new format
+        const newDB = {};
+        const newDomainMap = {};
+        let domainIdCounter = 1;
+        
+        for (const [url, data] of Object.entries(oldDB)) {
+          // Skip if already migrated
+          if (!isNaN(parseInt(url.split('/')[0]))) continue;
+          
+          // Convert URL to compressed format
+          const parts = url.split('/');
+          const domain = parts[0];
+          
+          if (!newDomainMap[domain]) {
+            newDomainMap[domain] = domainIdCounter++;
+          }
+          
+          const compressedUrl = parts.length > 1 ? 
+            `${newDomainMap[domain]}/${parts.slice(1).join('/')}` : 
+            `${newDomainMap[domain]}`;
+          
+          // Convert visits to timestamps
+          const convertedVisits = data.visits.map(visit => {
+            if (typeof visit === 'number') return visit; // Already timestamp
+            
+            // Parse "HH:MM DD/MM/YYYY" format
+            const [time, date] = visit.split(' ');
+            const [hours, minutes] = time.split(':').map(Number);
+            const [day, month, year] = date.split('/').map(Number);
+            return new Date(year, month - 1, day, hours, minutes).getTime();
+          });
+          
+          newDB[compressedUrl] = {
+            count: data.count,
+            visits: convertedVisits
+          };
+        }
+        
+        // Save migrated data
+        GM_setValue('visitDB', newDB);
+        GM_setValue('domainMap', newDomainMap);
+        console.log('Migration completed successfully!');
+      }
+    } catch (error) {
+      console.warn('Migration failed:', error);
+    }
+  }
+
   function updateVisit() {
     const db = getDB();
     const now = new Date();
-    const nowStr = formatDate(now);
+    const nowTimestamp = storeTimestamp(now);
+    const nowStr = formatTimestamp(nowTimestamp);
 
     if (!db[currentUrl]) {
       db[currentUrl] = { count: 1, visits: [nowStr] };
@@ -141,8 +303,13 @@
       return lastVisit < oldestLastVisit ? url : oldest;
     }, '');
 
+    // Calculate storage optimization
+    const rawDB = GM_getValue('visitDB', {});
+    const domainMapSize = JSON.stringify(GM_getValue('domainMap', {})).length;
+    const compressedSize = JSON.stringify(rawDB).length + domainMapSize;
+    
     const stats = `
-📈 Visit Tracker Statistics
+📈 Visit Tracker Statistics (v2.0)
 
 🌐 Total websites tracked: ${totalUrls}
 👆 Total visits recorded: ${totalVisits}
@@ -150,7 +317,10 @@
 ⏰ Oldest tracked site: ${oldestEntry}
 📅 Current page visits: ${db[currentUrl] ? db[currentUrl].count : 0}
 
-Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
+💾 Storage Optimization:
+📦 Compressed size: ${Math.round(compressedSize / 1024)} KB
+🗜️ Domain mappings: ${Object.keys(GM_getValue('domainMap', {})).length}
+⚡ Timestamp format: Optimized
     `.trim();
     
     alert(stats);
@@ -166,7 +336,8 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       
       // Immediately create new entry for current visit
       const now = new Date();
-      const nowStr = formatDate(now);
+      const nowTimestamp = storeTimestamp(now);
+      const nowStr = formatTimestamp(nowTimestamp);
       db[currentUrl] = { count: 1, visits: [nowStr] };
       setDB(db);
       
@@ -185,7 +356,8 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       
       // Immediately create new entry for current page
       const now = new Date();
-      const nowStr = formatDate(now);
+      const nowTimestamp = storeTimestamp(now);
+      const nowStr = formatTimestamp(nowTimestamp);
       const db = {};
       db[currentUrl] = { count: 1, visits: [nowStr] };
       setDB(db);
@@ -415,6 +587,9 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
 
   // Initialize the tracker
   function initializeTracker() {
+    // Run migration first
+    migrateOldData();
+    
     const db = getDB();
     
     // If current page has no data, show initial state
