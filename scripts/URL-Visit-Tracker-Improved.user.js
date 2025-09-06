@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.9.9
+// @version      2.0.0
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -245,11 +245,12 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       // Immediately create new entry for current visit
       const now = new Date();
       const timestamp = createTimestamp(now);
-      db[currentUrl] = { count: 1, visits: [timestamp] };
-      setDB(db);
+      const updatedDb = getDB();
+      updatedDb[currentUrl] = { count: 1, visits: [timestamp] };
+      setDB(updatedDb);
       
       // Update UI immediately with new data
-      renderBadge(db[currentUrl]);
+      renderBadge(updatedDb[currentUrl]);
       
       alert('Current page data cleared! Counter reset to 1.');
     }
@@ -263,12 +264,12 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       // Immediately create new entry for current page
       const now = new Date();
       const timestamp = createTimestamp(now);
-      const db = {};
-      db[currentUrl] = { count: 1, visits: [timestamp] };
-      setDB(db);
+      const newDb = {};
+      newDb[currentUrl] = { count: 1, visits: [timestamp] };
+      setDB(newDb);
       
       // Update UI immediately with new data
-      renderBadge(db[currentUrl]);
+      renderBadge(newDb[currentUrl]);
       
       alert('All visit data cleared! Current page counter reset to 1.');
     }
