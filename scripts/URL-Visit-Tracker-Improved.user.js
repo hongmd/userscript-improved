@@ -5,13 +5,14 @@
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @author       hongmd
 // @homepage     https://github.com/hongmd/userscript-improved
+// @homepageURL  https://github.com/hongmd/userscript-improved
 // @supportURL   https://github.com/hongmd/userscript-improved/issues
-// @updateURL    https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/URL-Visit-Tracker-Improved.user.js
-// @downloadURL  https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/URL-Visit-Tracker-Improved.user.js
 // @match        https://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @downloadURL  https://update.greasyfork.org/scripts/548595/URL%20Visit%20Tracker%20%28Improved%29.user.js
+// @updateURL    https://update.greasyfork.org/scripts/548595/URL%20Visit%20Tracker%20%28Improved%29.meta.js
 // ==/UserScript==
 
 (function () {
