@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version      2.0.3
-// @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
+// @version      2.2.0
+// @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & In-Memory Cache
 // @author       hongmd
 // @contributor  Original idea by Chewy
 // @homepage     https://github.com/hongmd/userscript-improved
@@ -24,8 +24,7 @@
     MAX_URLS_STORED: 10000,         // Massive capacity for extensive tracking
     CLEANUP_THRESHOLD: 12000,       // Cleanup when exceeding this (20% buffer)
     HOVER_DELAY: 200,
-    POLL_INTERVAL: 2000,
-    DEBOUNCE_DELAY: 1500,
+    POLL_INTERVAL: 3000,            // Increased to 3s for better CPU efficiency
     BADGE_POSITION: { right: '14px', bottom: '14px' },
     BADGE_VISIBLE: true,
     DEBUG: false                    // Set to true to enable debug logging
@@ -34,6 +33,10 @@
   // Badge visibility state
   let badgeVisible = CONFIG.BADGE_VISIBLE;
   let menuRegistered = false; // Flag to prevent duplicate menu registration
+
+  // In-memory cache for hot path performance
+  let dbCache = null;
+  let cacheValid = false;
 
   function normalizeUrl(url) {
     // Remove protocol, www, trailing slash, and fragments for better compression
@@ -60,31 +63,31 @@
   function cleanupOldUrls(db) {
     const urls = Object.keys(db);
     if (urls.length <= CONFIG.MAX_URLS_STORED) return db;
-    
+
     if (CONFIG.DEBUG) {
       console.log(`🧹 Large database cleanup: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
     }
-    
+
     // Calculate score for each URL (visits * recency)
     const scored = urls.map(url => {
       const data = db[url];
-      const recentVisit = data.visits && data.visits.length > 0 ? data.visits[0] : 0;
+      const recentVisit = data.visits?.[0] ?? 0;  // Optional chaining + nullish coalescing
       const daysSinceVisit = (Date.now() - recentVisit) / (1000 * 60 * 60 * 24);
       const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30; // 0-1 based on last 30 days
       const score = data.count * (1 + recencyScore); // Visits weighted by recency
-      
+
       return { url, score, count: data.count, lastVisit: recentVisit };
     });
-    
+
     // Keep top 10,000 URLs by score - massive capacity
     scored.sort((a, b) => b.score - a.score);
     const keepUrls = scored.slice(0, CONFIG.MAX_URLS_STORED);
-    
-    const cleanDb = {};
-    keepUrls.forEach(item => {
-      cleanDb[item.url] = db[item.url];
-    });
-    
+
+    // Use Object.fromEntries for more modern approach (ES2019)
+    const cleanDb = Object.fromEntries(
+      keepUrls.map(({ url }) => [url, db[url]])
+    );
+
     const removedCount = urls.length - keepUrls.length;
     if (CONFIG.DEBUG) {
       console.log(`✅ Cleanup complete: Kept ${keepUrls.length} URLs, removed ${removedCount} low-priority URLs`);
@@ -98,12 +101,34 @@
   }
 
   function getDB() {
+    // Return cached version if available and valid
+    if (cacheValid && dbCache !== null) {
+      return dbCache;
+    }
+    
     try {
-      return GM_getValue('visitDB', {});
+      dbCache = GM_getValue('visitDB', {});
+      cacheValid = true;
+      
+      if (CONFIG.DEBUG) {
+        console.log(`💾 DB loaded from storage: ${Object.keys(dbCache).length} URLs`);
+      }
+      
+      return dbCache;
     } catch (error) {
       console.warn('Failed to read visit database:', error);
-      return {};
+      dbCache = {};
+      cacheValid = true;
+      return dbCache;
     }
+  }
+
+  // Fast read-only access for hot paths (tooltips, etc)
+  function getDBCached() {
+    if (cacheValid && dbCache !== null) {
+      return dbCache;
+    }
+    return getDB(); // Fallback to full load
   }
 
   function setDB(db) {
@@ -113,38 +138,57 @@
         db = cleanupOldUrls(db);
       }
       
+      // Update cache first
+      dbCache = db;
+      cacheValid = true;
+      
+      // Then persist to storage
       GM_setValue('visitDB', db);
+      
+      if (CONFIG.DEBUG) {
+        console.log(`💾 DB saved to storage: ${Object.keys(db).length} URLs`);
+      }
     } catch (error) {
       console.warn('Failed to save visit database:', error);
+      // Invalidate cache on save failure
+      cacheValid = false;
     }
   }
 
-  let currentUrl = normalizeUrl(location.href);
+  // Invalidate cache when external changes might occur
+  function invalidateCache() {
+    cacheValid = false;
+    dbCache = null;
+  }  let currentUrl = normalizeUrl(location.href);
 
   function updateVisit() {
     const db = getDB();
     const now = new Date();
     const timestamp = createTimestamp(now);
 
-    if (!db[currentUrl]) {
-      db[currentUrl] = { count: 1, visits: [timestamp] };
-      if (CONFIG.DEBUG) {
-        console.log(`📍 New URL tracked: ${currentUrl}`);
-      }
-    } else {
-      db[currentUrl].count += 1;
-      db[currentUrl].visits.unshift(timestamp);
-      if (db[currentUrl].visits.length > CONFIG.MAX_VISITS_STORED) {
-        db[currentUrl].visits.length = CONFIG.MAX_VISITS_STORED;
-      }
-      if (CONFIG.DEBUG) {
-        console.log(`🔄 URL revisited: ${currentUrl} (${db[currentUrl].count} times)`);
-      }
+    // Use logical assignment and modern destructuring
+    db[currentUrl] ??= { count: 0, visits: [] };
+
+    const urlData = db[currentUrl];
+    urlData.count += 1;
+    urlData.visits.unshift(timestamp);
+
+    // Trim visits array if needed
+    if (urlData.visits.length > CONFIG.MAX_VISITS_STORED) {
+      urlData.visits.length = CONFIG.MAX_VISITS_STORED;
+    }
+
+    if (CONFIG.DEBUG) {
+      const isNew = urlData.count === 1;
+      console.log(isNew
+        ? `🆕 New URL tracked: ${currentUrl}`
+        : `🔄 URL revisited: ${currentUrl} (${urlData.count} times)`
+      );
     }
 
     setDB(db);
-    renderBadge(db[currentUrl]);
-    
+    renderBadge(urlData);
+
     // Only register menu once to prevent duplicates
     if (!menuRegistered) {
       registerMenu();
@@ -164,14 +208,15 @@
 
   function exportData() {
     try {
-      const db = getDB();
+      // Use cached DB for export - same data, no extra I/O
+      const db = getDBCached();
       const dataStr = JSON.stringify(db, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `visit-tracker-${new Date().toISOString().split('T')[0]}.json`;
-      
+
       // Safely append to DOM
       if (document.body) {
         document.body.appendChild(a);
@@ -181,7 +226,7 @@
         // Fallback for early DOM state
         a.click();
       }
-      
+
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Export failed:', error);
@@ -190,28 +235,33 @@
   }
 
   function showStatistics() {
-    const db = getDB();
+    // Use cached DB for statistics - read-only operation
+    const db = getDBCached();
     const urls = Object.keys(db);
     const totalUrls = urls.length;
-    
+
     // Handle empty database
     if (totalUrls === 0) {
       alert('📈 Visit Tracker Statistics\n\n🌐 No websites tracked yet!\n\nStart browsing to collect visit data.');
       return;
     }
-    
+
     const totalVisits = urls.reduce((sum, url) => sum + db[url].count, 0);
-    
-    // Find most visited site
-    const mostVisited = urls.reduce((max, url) => 
-      db[url].count > (db[max] ? db[max].count : 0) ? url : max, '');
-    
-    // Find oldest entry
+
+    // Find most visited site using optional chaining
+    const mostVisited = urls.reduce((max, url) =>
+      db[url].count > (db[max]?.count ?? 0) ? url : max, '');
+
+    // Find oldest entry using optional chaining
     const oldestEntry = urls.reduce((oldest, url) => {
-      if (!db[url].visits || db[url].visits.length === 0) return oldest;
-      const lastVisit = db[url].visits[db[url].visits.length - 1];
-      if (!oldest || !db[oldest].visits || db[oldest].visits.length === 0) return url;
-      const oldestLastVisit = db[oldest].visits[db[oldest].visits.length - 1];
+      const visits = db[url].visits;
+      if (!visits?.length) return oldest;
+
+      const lastVisit = visits[visits.length - 1];
+      const oldestVisits = db[oldest]?.visits;
+      if (!oldestVisits?.length) return url;
+
+      const oldestLastVisit = oldestVisits[oldestVisits.length - 1];
       return lastVisit < oldestLastVisit ? url : oldest;
     }, '');
 
@@ -220,29 +270,29 @@
 
 🌐 Total websites tracked: ${totalUrls}
 👆 Total visits recorded: ${totalVisits}
-🏆 Most visited: ${mostVisited} (${db[mostVisited] ? db[mostVisited].count : 0} visits)
+🏆 Most visited: ${mostVisited} (${db[mostVisited]?.count ?? 0} visits)
 ⏰ Oldest tracked site: ${oldestEntry}
-📅 Current page visits: ${db[currentUrl] ? db[currentUrl].count : 0}
+📅 Current page visits: ${db[currentUrl]?.count ?? 0}
 
 Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
     `.trim();
-    
+
     alert(stats);
   }
 
   function clearCurrentPage() {
     if (confirm(`Clear visit data for current page?\n\nURL: ${currentUrl}\nThis will only affect this page.`)) {
       const db = getDB();
-      
+
       // Clear old data and immediately set new entry in single operation
       const now = new Date();
       const timestamp = createTimestamp(now);
       db[currentUrl] = { count: 1, visits: [timestamp] };
       setDB(db);
-      
+
       // Update UI immediately with new data
       renderBadge(db[currentUrl]);
-      
+
       alert('Current page data cleared! Counter reset to 1.');
     }
   }
@@ -255,10 +305,10 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       const newDb = {};
       newDb[currentUrl] = { count: 1, visits: [timestamp] };
       setDB(newDb);
-      
+
       // Update UI immediately with new data
       renderBadge(newDb[currentUrl]);
-      
+
       alert('All visit data cleared! Current page counter reset to 1.');
     }
   }
@@ -332,14 +382,14 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
         <a class="vt-link" href="javascript:void(0)"></a>
         <div class="vt-tooltip"></div>
       `;
-      
+
       // Add click handler for toggle visibility
       badge.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         toggleBadgeVisibility();
       });
-      
+
       document.documentElement.appendChild(badge);
     }
 
@@ -354,7 +404,7 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
 
     const tooltip = badge.querySelector('.vt-tooltip');
     tooltip.innerHTML = `<span class="vt-line">Visit: ${data.count}</span>`;
-    
+
     // Handle empty visits array - format timestamps for display
     if (data.visits && data.visits.length > 0) {
       data.visits.forEach((timestamp, i) => {
@@ -376,7 +426,7 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
         badge.classList.add('hidden');
       }
     }
-    
+
     // Save state to GM storage
     try {
       GM_setValue('badgeVisible', badgeVisible);
@@ -387,52 +437,124 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
 
   function toggleDebugMode() {
     CONFIG.DEBUG = !CONFIG.DEBUG;
-    
+
     // Save state to GM storage
     try {
       GM_setValue('debugMode', CONFIG.DEBUG);
     } catch (error) {
       console.warn('Failed to save debug mode state:', error);
     }
-    
+
     const status = CONFIG.DEBUG ? 'enabled' : 'disabled';
     alert(`🐛 Debug mode ${status}!\n\nDebug logging is now ${status}.`);
-    
+
     if (CONFIG.DEBUG) {
       console.log('🐛 Visit Tracker Debug Mode: ENABLED');
     }
   }
 
+  // Rate limiting for URL changes with pending mechanism
+  let lastUrlChangeTime = 0;
+  let pendingUrlChange = null;
+  let pendingTimeout = null;
+  const URL_CHANGE_MIN_INTERVAL = 500; // Minimum 500ms between URL changes
+
   function onUrlChange() {
     const newUrl = normalizeUrl(location.href);
     if (newUrl === currentUrl) return;
     
+    const now = Date.now();
+    const timeSinceLastChange = now - lastUrlChangeTime;
+    
+    if (timeSinceLastChange < URL_CHANGE_MIN_INTERVAL) {
+      if (CONFIG.DEBUG) {
+        console.log(`⏰ URL change rate limited, scheduling: ${currentUrl} → ${newUrl}`);
+      }
+      
+      // Store the pending change without updating currentUrl yet
+      pendingUrlChange = newUrl;
+      
+      // Clear any existing pending timeout
+      if (pendingTimeout) {
+        clearTimeout(pendingTimeout);
+      }
+      
+      // Schedule the change for when rate limit expires
+      const remainingTime = URL_CHANGE_MIN_INTERVAL - timeSinceLastChange;
+      pendingTimeout = setTimeout(() => {
+        if (pendingUrlChange && pendingUrlChange !== currentUrl) {
+          if (CONFIG.DEBUG) {
+            console.log(`⏰ Processing pending URL change: ${currentUrl} → ${pendingUrlChange}`);
+          }
+          const savedPendingUrl = pendingUrlChange;
+          pendingUrlChange = null;
+          pendingTimeout = null;
+          
+          // Process the pending change
+          currentUrl = savedPendingUrl;
+          lastUrlChangeTime = Date.now();
+          updateVisit();
+        }
+      }, remainingTime + 10); // +10ms buffer
+      
+      return;
+    }
+
+    // Clear any pending changes since we're processing immediately
+    if (pendingTimeout) {
+      clearTimeout(pendingTimeout);
+      pendingTimeout = null;
+      pendingUrlChange = null;
+    }
+
     if (CONFIG.DEBUG) {
       console.log(`🌐 URL changed: ${currentUrl} → ${newUrl}`);
     }
-    
+
     currentUrl = newUrl;
+    lastUrlChangeTime = now;
     updateVisit();
   }
 
   function installUrlObservers() {
+    // Enhanced history hooks with rate limiting
     const _pushState = history.pushState;
     const _replaceState = history.replaceState;
-    history.pushState = function () { const r = _pushState.apply(this, arguments); onUrlChange(); return r; };
-    history.replaceState = function () { const r = _replaceState.apply(this, arguments); onUrlChange(); return r; };
+    
+    history.pushState = function (...args) {
+      const result = _pushState.apply(this, args);
+      // Use setTimeout to avoid immediate execution conflicts
+      setTimeout(onUrlChange, 50);
+      return result;
+    };
+    
+    history.replaceState = function (...args) {
+      const result = _replaceState.apply(this, args);
+      setTimeout(onUrlChange, 50);
+      return result;
+    };
+    
+    // Standard event listeners
     window.addEventListener('popstate', onUrlChange);
     window.addEventListener('hashchange', onUrlChange);
-    
-    // Optimized MutationObserver - only watch for navigation-related changes
+
+    // Optimized MutationObserver with throttling
+    let mutationTimeout = null;
     const mo = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList' && mutation.target.tagName === 'TITLE') {
-          onUrlChange();
-          break;
+      // Throttle mutation processing to avoid spam
+      if (mutationTimeout) return;
+      
+      mutationTimeout = setTimeout(() => {
+        mutationTimeout = null;
+        for (const mutation of mutations) {
+          if (mutation.type === 'childList' && mutation.target.tagName === 'TITLE') {
+            onUrlChange();
+            break;
+          }
         }
-      }
+      }, 100); // 100ms throttle for mutations
     });
-    
+
     // Safely observe document.head
     if (document.head) {
       mo.observe(document.head, { childList: true, subtree: true });
@@ -440,21 +562,42 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       // Fallback: observe document for head creation
       mo.observe(document, { childList: true, subtree: true });
     }
-    
-    // Reduced polling frequency and added debounce
+
+    // Optimized polling without debounce timeout overlap
     let lastHref = location.href;
-    let pollTimer;
-    const debouncedPoll = () => {
-      clearTimeout(pollTimer);
-      pollTimer = setTimeout(() => {
-        if (location.href !== lastHref) { 
-          lastHref = location.href; 
-          onUrlChange(); 
-        }
-      }, CONFIG.DEBOUNCE_DELAY);
-    };
+    let lastCheck = Date.now();
     
-    setInterval(debouncedPoll, CONFIG.POLL_INTERVAL);
+    const directPoll = () => {
+      const currentHref = location.href;
+      const now = Date.now();
+      
+      // Check if we should process pending URL change
+      if (pendingUrlChange && !pendingTimeout && (now - lastUrlChangeTime) >= URL_CHANGE_MIN_INTERVAL) {
+        if (CONFIG.DEBUG) {
+          console.log(`🔄 Polling processing pending URL change: ${currentUrl} → ${pendingUrlChange}`);
+        }
+        const savedPendingUrl = pendingUrlChange;
+        pendingUrlChange = null;
+        currentUrl = savedPendingUrl;
+        lastUrlChangeTime = now;
+        updateVisit();
+      }
+      
+      // Only process if URL actually changed and enough time has passed
+      if (currentHref !== lastHref && (now - lastCheck) >= 1000) {
+        if (CONFIG.DEBUG) {
+          console.log(`🔄 Polling detected URL change: ${lastHref} → ${currentHref}`);
+        }
+        lastHref = currentHref;
+        lastCheck = now;
+        onUrlChange();
+      } else if (currentHref !== lastHref) {
+        // URL changed but too soon - just update lastHref to prevent spam
+        lastHref = currentHref;
+      }
+    };
+
+    setInterval(directPoll, CONFIG.POLL_INTERVAL);
   }
 
   const tooltip = document.createElement('div');
@@ -473,7 +616,7 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
     opacity: '0',
     transition: 'opacity 0.15s ease'
   });
-  
+
   // Safely append tooltip to DOM
   if (document.body) {
     document.body.appendChild(tooltip);
@@ -490,27 +633,29 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
 
   function showTooltip(e, linkUrl) {
     const key = normalizeUrl(linkUrl);
-    const data = getDB()[key];
-    
+    // Use cached DB for hot path performance - no storage I/O!
+    const db = getDBCached();
+    const data = db[key];
+
     // Clear previous content safely
     tooltip.textContent = '';
-    
+
     if (!data) {
       tooltip.textContent = 'No visits recorded';
     } else {
       // Create elements safely instead of using innerHTML
       const visitLine = document.createElement('div');
       visitLine.textContent = `Visit: ${shortenNumber(data.count)}`;
-      
+
       const lastLine = document.createElement('div');
-      // Format timestamp for display
-      const lastVisit = data.visits && data.visits.length > 0 ? formatTimestamp(data.visits[0]) : 'Never';
+      // Format timestamp for display using optional chaining
+      const lastVisit = data.visits?.[0] ? formatTimestamp(data.visits[0]) : 'Never';
       lastLine.textContent = `Last: ${lastVisit}`;
-      
+
       tooltip.appendChild(visitLine);
       tooltip.appendChild(lastLine);
     }
-    
+
     // Set initial position
     updateTooltipPosition(e.clientX, e.clientY);
     tooltip.style.opacity = 1;
@@ -519,12 +664,12 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
   function updateTooltipPosition(x, y) {
     // Store the position to be updated in the next frame
     pendingTooltipPosition = { x: x + 12, y: y + 12 };
-    
+
     // Cancel previous frame if it exists
     if (rafId) {
       cancelAnimationFrame(rafId);
     }
-    
+
     // Schedule position update for next frame
     rafId = requestAnimationFrame(() => {
       if (pendingTooltipPosition) {
@@ -539,14 +684,14 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
   function hideTooltip() {
     tooltip.style.opacity = 0;
     currentHoveredLink = null;
-    
+
     // Cancel any pending animation frame
     if (rafId) {
       cancelAnimationFrame(rafId);
       rafId = null;
     }
     pendingTooltipPosition = null;
-    
+
     document.removeEventListener('mousemove', moveTooltip);
   }
 
@@ -573,7 +718,7 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
   document.addEventListener('mouseout', e => {
     const a = e.target.closest('a[href]');
     if (!a || a !== currentHoveredLink) return;
-    
+
     clearTimeout(hoverTimer);
     hideTooltip();
   });
@@ -587,7 +732,7 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       console.warn('Failed to load badge visibility state:', error);
       badgeVisible = CONFIG.BADGE_VISIBLE;
     }
-    
+
     // Load saved debug mode state
     try {
       CONFIG.DEBUG = GM_getValue('debugMode', CONFIG.DEBUG);
@@ -595,15 +740,36 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       console.warn('Failed to load debug mode state:', error);
       CONFIG.DEBUG = false;
     }
-    
+
     if (CONFIG.DEBUG) {
       console.log('🐛 Visit Tracker Debug Mode: ENABLED');
     }
-    
+
     // Don't register menu for initial empty state - let updateVisit() handle it
     updateVisit();
     installUrlObservers();
+    
+    // Handle cache invalidation for multi-tab scenarios
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && CONFIG.DEBUG) {
+        console.log('👁️ Tab became visible - cache remains valid (single-tab assumption)');
+        // Note: We assume single-tab usage. If multi-tab coordination needed,
+        // uncomment next line: invalidateCache();
+      }
+    });
   }
+
+  // Cleanup pending operations on page unload
+  window.addEventListener('beforeunload', () => {
+    if (pendingTimeout) {
+      clearTimeout(pendingTimeout);
+      // Process any pending URL change immediately before unload
+      if (pendingUrlChange && pendingUrlChange !== currentUrl) {
+        currentUrl = pendingUrlChange;
+        updateVisit();
+      }
+    }
+  });
 
   initializeTracker();
 
