@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.9.7
+// @version      1.9.9
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @match        https://*/*
 // @grant        GM_getValue
@@ -26,6 +26,7 @@
 
   // Badge visibility state
   let badgeVisible = CONFIG.BADGE_VISIBLE;
+  let menuRegistered = false; // Flag to prevent duplicate menu registration
 
   function normalizeUrl(url) {
     // Remove protocol, www, trailing slash, and fragments for better compression
@@ -126,24 +127,17 @@
 
     setDB(db);
     renderBadge(db[currentUrl]);
-    registerMenu(db[currentUrl]);
+    
+    // Only register menu once to prevent duplicates
+    if (!menuRegistered) {
+      registerMenu();
+      menuRegistered = true;
+    }
   }
 
-  function registerMenu(data) {
-    // Only register menu commands if we have actual visit data
-    if (data.count > 0) {
-      GM_registerMenuCommand(`Visit: ${shortenNumber(data.count)}`, () => { });
-      
-      // Handle case when no visits exist - format timestamp for display
-      const lastVisit = (data.visits && data.visits.length > 0) ? formatTimestamp(data.visits[0]) : 'Never';
-      if (lastVisit !== 'Never') {
-        GM_registerMenuCommand(`Last: ${lastVisit}`, () => { });
-      }
-    }
-    
-    // Toggle badge visibility menu
-    GM_registerMenuCommand(badgeVisible ? '👁️ Hide Badge' : '👁️ Show Badge', toggleBadgeVisibility);
-    
+  function registerMenu() {
+    // Register static menu items once to prevent duplicates
+    GM_registerMenuCommand('👁️ Toggle Badge', toggleBadgeVisibility);
     GM_registerMenuCommand('📊 Export Data', exportData);
     GM_registerMenuCommand('📈 Show Statistics', showStatistics);
     GM_registerMenuCommand('🗑️ Clear Current Page', clearCurrentPage);
@@ -234,7 +228,6 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       
       // Update UI immediately with new data
       renderBadge(db[currentUrl]);
-      registerMenu(db[currentUrl]);
       
       alert('Current page data cleared! Counter reset to 1.');
     }
@@ -254,7 +247,6 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       
       // Update UI immediately with new data
       renderBadge(db[currentUrl]);
-      registerMenu(db[currentUrl]);
       
       alert('All visit data cleared! Current page counter reset to 1.');
     }
@@ -458,6 +450,8 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
 
   let hoverTimer;
   let currentHoveredLink = null;
+  let rafId = null; // RequestAnimationFrame ID for smooth tooltip movement
+  let pendingTooltipPosition = null; // Store pending position updates
 
   function showTooltip(e, linkUrl) {
     const key = normalizeUrl(linkUrl);
@@ -481,20 +475,49 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
       tooltip.appendChild(visitLine);
       tooltip.appendChild(lastLine);
     }
-    tooltip.style.left = e.clientX + 12 + 'px';
-    tooltip.style.top = e.clientY + 12 + 'px';
+    
+    // Set initial position
+    updateTooltipPosition(e.clientX, e.clientY);
     tooltip.style.opacity = 1;
+  }
+
+  function updateTooltipPosition(x, y) {
+    // Store the position to be updated in the next frame
+    pendingTooltipPosition = { x: x + 12, y: y + 12 };
+    
+    // Cancel previous frame if it exists
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+    }
+    
+    // Schedule position update for next frame
+    rafId = requestAnimationFrame(() => {
+      if (pendingTooltipPosition) {
+        tooltip.style.left = pendingTooltipPosition.x + 'px';
+        tooltip.style.top = pendingTooltipPosition.y + 'px';
+        pendingTooltipPosition = null;
+      }
+      rafId = null;
+    });
   }
 
   function hideTooltip() {
     tooltip.style.opacity = 0;
     currentHoveredLink = null;
+    
+    // Cancel any pending animation frame
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    pendingTooltipPosition = null;
+    
     document.removeEventListener('mousemove', moveTooltip);
   }
 
   function moveTooltip(e) {
-    tooltip.style.left = e.clientX + 12 + 'px';
-    tooltip.style.top = e.clientY + 12 + 'px';
+    // Use requestAnimationFrame for smooth movement
+    updateTooltipPosition(e.clientX, e.clientY);
   }
 
   document.addEventListener('mouseover', e => {
