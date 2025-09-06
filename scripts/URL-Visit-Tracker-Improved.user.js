@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version      2.0.2
+// @version      2.0.3
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -18,21 +18,6 @@
 (function () {
   'use strict';
 
-  /*
-   * URL Visit Tracker (Improved)
-   * 
-   * Credits:
-   * - Original concept and idea by Chewy
-   * - Enhanced and optimized by hongmd
-   * 
-   * This script builds upon the original vision while adding:
-   * - Massive capacity (10K URLs) with smart cleanup
-   * - Toggle badge visibility with smooth animations  
-   * - RequestAnimationFrame tooltip movement
-   * - Advanced storage optimization and performance
-   * - Production-ready error handling and edge cases
-   */
-
   // Configuration options
   const CONFIG = {
     MAX_VISITS_STORED: 20,
@@ -42,7 +27,8 @@
     POLL_INTERVAL: 2000,
     DEBOUNCE_DELAY: 1500,
     BADGE_POSITION: { right: '14px', bottom: '14px' },
-    BADGE_VISIBLE: true
+    BADGE_VISIBLE: true,
+    DEBUG: false                    // Set to true to enable debug logging
   };
 
   // Badge visibility state
@@ -75,7 +61,9 @@
     const urls = Object.keys(db);
     if (urls.length <= CONFIG.MAX_URLS_STORED) return db;
     
-    console.log(`🧹 Large database cleanup: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
+    if (CONFIG.DEBUG) {
+      console.log(`🧹 Large database cleanup: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
+    }
     
     // Calculate score for each URL (visits * recency)
     const scored = urls.map(url => {
@@ -98,7 +86,9 @@
     });
     
     const removedCount = urls.length - keepUrls.length;
-    console.log(`✅ Cleanup complete: Kept ${keepUrls.length} URLs, removed ${removedCount} low-priority URLs`);
+    if (CONFIG.DEBUG) {
+      console.log(`✅ Cleanup complete: Kept ${keepUrls.length} URLs, removed ${removedCount} low-priority URLs`);
+    }
     return cleanDb;
   }
 
@@ -138,11 +128,17 @@
 
     if (!db[currentUrl]) {
       db[currentUrl] = { count: 1, visits: [timestamp] };
+      if (CONFIG.DEBUG) {
+        console.log(`📍 New URL tracked: ${currentUrl}`);
+      }
     } else {
       db[currentUrl].count += 1;
       db[currentUrl].visits.unshift(timestamp);
       if (db[currentUrl].visits.length > CONFIG.MAX_VISITS_STORED) {
         db[currentUrl].visits.length = CONFIG.MAX_VISITS_STORED;
+      }
+      if (CONFIG.DEBUG) {
+        console.log(`🔄 URL revisited: ${currentUrl} (${db[currentUrl].count} times)`);
       }
     }
 
@@ -163,6 +159,7 @@
     GM_registerMenuCommand('📈 Show Statistics', showStatistics);
     GM_registerMenuCommand('🗑️ Clear Current Page', clearCurrentPage);
     GM_registerMenuCommand('💥 Clear All Data', clearAllData);
+    GM_registerMenuCommand('🐛 Toggle Debug Mode', toggleDebugMode);
   }
 
   function exportData() {
@@ -237,19 +234,14 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
     if (confirm(`Clear visit data for current page?\n\nURL: ${currentUrl}\nThis will only affect this page.`)) {
       const db = getDB();
       
-      // Delete old data
-      delete db[currentUrl];
-      setDB(db);
-      
-      // Immediately create new entry for current visit
+      // Clear old data and immediately set new entry in single operation
       const now = new Date();
       const timestamp = createTimestamp(now);
-      const updatedDb = getDB();
-      updatedDb[currentUrl] = { count: 1, visits: [timestamp] };
-      setDB(updatedDb);
+      db[currentUrl] = { count: 1, visits: [timestamp] };
+      setDB(db);
       
       // Update UI immediately with new data
-      renderBadge(updatedDb[currentUrl]);
+      renderBadge(db[currentUrl]);
       
       alert('Current page data cleared! Counter reset to 1.');
     }
@@ -257,10 +249,7 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
 
   function clearAllData() {
     if (confirm('⚠️ WARNING: This will clear ALL visit data from ALL websites!\n\nAre you absolutely sure?')) {
-      // Clear all data
-      setDB({});
-      
-      // Immediately create new entry for current page
+      // Clear all data and immediately create new entry for current page in single operation
       const now = new Date();
       const timestamp = createTimestamp(now);
       const newDb = {};
@@ -396,9 +385,32 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
     }
   }
 
+  function toggleDebugMode() {
+    CONFIG.DEBUG = !CONFIG.DEBUG;
+    
+    // Save state to GM storage
+    try {
+      GM_setValue('debugMode', CONFIG.DEBUG);
+    } catch (error) {
+      console.warn('Failed to save debug mode state:', error);
+    }
+    
+    const status = CONFIG.DEBUG ? 'enabled' : 'disabled';
+    alert(`🐛 Debug mode ${status}!\n\nDebug logging is now ${status}.`);
+    
+    if (CONFIG.DEBUG) {
+      console.log('🐛 Visit Tracker Debug Mode: ENABLED');
+    }
+  }
+
   function onUrlChange() {
     const newUrl = normalizeUrl(location.href);
     if (newUrl === currentUrl) return;
+    
+    if (CONFIG.DEBUG) {
+      console.log(`🌐 URL changed: ${currentUrl} → ${newUrl}`);
+    }
+    
     currentUrl = newUrl;
     updateVisit();
   }
@@ -446,20 +458,21 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
   }
 
   const tooltip = document.createElement('div');
-  tooltip.style.cssText = `
-    position: fixed;
-    padding: 6px 8px;
-    font-size: 12px;
-    font-family: system-ui, sans-serif;
-    background: rgba(20, 20, 20, 0.9);
-    color: white;
-    border-radius: 6px;
-    pointer-events: none;
-    white-space: nowrap;
-    z-index: 999999;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-  `;
+  // Apply styles using individual properties for better compatibility
+  Object.assign(tooltip.style, {
+    position: 'fixed',
+    padding: '6px 8px',
+    fontSize: '12px',
+    fontFamily: 'system-ui, sans-serif',
+    background: 'rgba(20, 20, 20, 0.9)',
+    color: 'white',
+    borderRadius: '6px',
+    pointerEvents: 'none',
+    whiteSpace: 'nowrap',
+    zIndex: '999999',
+    opacity: '0',
+    transition: 'opacity 0.15s ease'
+  });
   
   // Safely append tooltip to DOM
   if (document.body) {
@@ -573,6 +586,18 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
     } catch (error) {
       console.warn('Failed to load badge visibility state:', error);
       badgeVisible = CONFIG.BADGE_VISIBLE;
+    }
+    
+    // Load saved debug mode state
+    try {
+      CONFIG.DEBUG = GM_getValue('debugMode', CONFIG.DEBUG);
+    } catch (error) {
+      console.warn('Failed to load debug mode state:', error);
+      CONFIG.DEBUG = false;
+    }
+    
+    if (CONFIG.DEBUG) {
+      console.log('🐛 Visit Tracker Debug Mode: ENABLED');
     }
     
     // Don't register menu for initial empty state - let updateVisit() handle it
