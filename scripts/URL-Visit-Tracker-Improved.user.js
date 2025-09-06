@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.9.5
+// @version      1.9.6
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @match        https://*/*
 // @grant        GM_getValue
@@ -127,11 +127,16 @@
   }
 
   function registerMenu(data) {
-    GM_registerMenuCommand(`Visit: ${shortenNumber(data.count)}`, () => { });
-    
-    // Handle case when no visits exist - format timestamp for display
-    const lastVisit = (data.visits && data.visits.length > 0) ? formatTimestamp(data.visits[0]) : 'Never';
-    GM_registerMenuCommand(`Last: ${lastVisit}`, () => { });
+    // Only register menu commands if we have actual visit data
+    if (data.count > 0) {
+      GM_registerMenuCommand(`Visit: ${shortenNumber(data.count)}`, () => { });
+      
+      // Handle case when no visits exist - format timestamp for display
+      const lastVisit = (data.visits && data.visits.length > 0) ? formatTimestamp(data.visits[0]) : 'Never';
+      if (lastVisit !== 'Never') {
+        GM_registerMenuCommand(`Last: ${lastVisit}`, () => { });
+      }
+    }
     
     GM_registerMenuCommand('📊 Export Data', exportData);
     GM_registerMenuCommand('📈 Show Statistics', showStatistics);
@@ -471,13 +476,7 @@ Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
   function initializeTracker() {
     const db = getDB();
     
-    // If current page has no data, show initial state
-    if (!db[currentUrl]) {
-      const initialData = { count: 0, visits: [] };
-      renderBadge(initialData);
-      registerMenu(initialData);
-    }
-    
+    // Don't register menu for initial empty state - let updateVisit() handle it
     updateVisit();
     installUrlObservers();
   }
