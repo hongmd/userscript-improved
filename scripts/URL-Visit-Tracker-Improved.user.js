@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.9.2
+// @version      1.9.3
 // @description  Track visits per URL, show corner badge history & link hover info - Improved Performance & Storage
 // @match        https://*/*
 // @grant        GM_getValue
@@ -15,6 +15,8 @@
   // Configuration options
   const CONFIG = {
     MAX_VISITS_STORED: 20,
+    MAX_URLS_STORED: 300,           // Limit total URLs to prevent bloat
+    CLEANUP_THRESHOLD: 350,         // Cleanup when exceeding this
     HOVER_DELAY: 200,
     POLL_INTERVAL: 2000,
     DEBOUNCE_DELAY: 1500,
@@ -23,7 +25,13 @@
   };
 
   function normalizeUrl(url) {
-    return url.replace(/^https?:\/\//, '').split('#')[0];
+    // Remove protocol, www, trailing slash, and fragments for better compression
+    return url
+      .replace(/^https?:\/\//, '')        // Remove protocol
+      .replace(/^www\./, '')              // Remove www
+      .replace(/\/$/, '')                 // Remove trailing slash
+      .split('#')[0]                      // Remove fragments
+      .split('?')[0];                     // Remove query params (optional - keeps core path only)
   }
 
   // Optimized functions for timestamp storage
@@ -35,6 +43,37 @@
     const date = new Date(timestamp);
     const pad = n => n.toString().padStart(2, '0');
     return `${pad(date.getHours())}:${pad(date.getMinutes())} ${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  }
+
+  // Smart cleanup to maintain database size
+  function cleanupOldUrls(db) {
+    const urls = Object.keys(db);
+    if (urls.length <= CONFIG.MAX_URLS_STORED) return db;
+    
+    console.log(`Cleaning up database: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
+    
+    // Calculate score for each URL (visits * recency)
+    const scored = urls.map(url => {
+      const data = db[url];
+      const recentVisit = data.visits && data.visits.length > 0 ? data.visits[0] : 0;
+      const daysSinceVisit = (Date.now() - recentVisit) / (1000 * 60 * 60 * 24);
+      const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30; // 0-1 based on last 30 days
+      const score = data.count * (1 + recencyScore); // Visits weighted by recency
+      
+      return { url, score, count: data.count, lastVisit: recentVisit };
+    });
+    
+    // Keep top URLs by score
+    scored.sort((a, b) => b.score - a.score);
+    const keepUrls = scored.slice(0, CONFIG.MAX_URLS_STORED);
+    
+    const cleanDb = {};
+    keepUrls.forEach(item => {
+      cleanDb[item.url] = db[item.url];
+    });
+    
+    console.log(`Cleanup complete: Kept ${keepUrls.length} top URLs`);
+    return cleanDb;
   }
 
   function shortenNumber(num) {
@@ -53,6 +92,11 @@
 
   function setDB(db) {
     try {
+      // Auto cleanup if database is getting too large
+      if (Object.keys(db).length > CONFIG.CLEANUP_THRESHOLD) {
+        db = cleanupOldUrls(db);
+      }
+      
       GM_setValue('visitDB', db);
     } catch (error) {
       console.warn('Failed to save visit database:', error);
