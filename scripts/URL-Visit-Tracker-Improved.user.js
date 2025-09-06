@@ -3,6 +3,11 @@
 // @namespace    URL Visit Tracker
 // @version      1.9.9
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
+// @author       hongmd
+// @homepage     https://github.com/hongmd/userscript-improved
+// @supportURL   https://github.com/hongmd/userscript-improved/issues
+// @updateURL    https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/URL-Visit-Tracker-Improved.user.js
+// @downloadURL  https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/URL-Visit-Tracker-Improved.user.js
 // @match        https://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue

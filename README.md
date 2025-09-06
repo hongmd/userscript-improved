@@ -4,70 +4,91 @@ A collection of high-performance userscripts for enhanced web browsing experienc
 
 ## 🚀 Featured Scripts
 
-### 📊 URL Visit Tracker (Improved) - v1.9.3
+### 📊 URL Visit Tracker (Improved) - v1.9.9
 **File:** `scripts/URL-Visit-Tracker-Improved.user.js`
 
 An advanced, storage-optimized userscript that intelligently tracks website visits with smart data management and performance enhancements.
 
-#### ✨ Latest Features (v1.9.3)
-- **🗜️ Storage Optimization** - Timestamp compression saves ~50% storage space
-- **🧹 Smart Auto-Cleanup** - Intelligent URL management keeps database under 350 entries
-- **🎯 Priority Scoring** - Keeps important URLs based on visit frequency + recency
-- **🔧 Enhanced URL Normalization** - Better compression with www/protocol removal
-- **⚡ Performance Boost** - Optimized data structures and reduced memory footprint
+#### ✨ Latest Features (v1.9.9)
+- **�️ Toggle Badge Visibility** - Click badge or use menu to hide/show with smooth animations
+- **🎯 Position Configuration** - Customizable badge position via CONFIG.BADGE_POSITION
+- **🚫 No Duplicate Menus** - Fixed menu registration to prevent duplicates
+- **�️ Smooth Tooltip Movement** - RequestAnimationFrame for buttery smooth mouse tracking
+- **🔧 Enhanced Performance** - Optimized animations and reduced CPU usage
 
 #### 🎯 Core Features
-- **🔢 Visit Counter Badge** - Floating badge showing visit count for current page
-- **📈 Real-time Statistics** - Track total visits across all websites with size monitoring
-- **🕒 Smart History** - Optimized timestamp storage with configurable limits
-- **💾 Data Export** - Export visit data as JSON with error handling
+- **🔢 Visit Counter Badge** - Floating badge with toggleable visibility and smooth transitions
+- **📈 Real-time Statistics** - Track total visits across all websites with database management
+- **🕒 Smart History** - Optimized timestamp storage with hover tooltips
+- **💾 Data Export** - Export visit data as JSON with comprehensive error handling
 - **🗑️ Intelligent Clearing** - Clear current page or all data with instant UI updates
-- **🖱️ Link Hover Info** - Hover over links to see visit history with formatted timestamps
-- **🛡️ Production Ready** - Comprehensive error handling and edge case protection
-
-#### 🧠 Smart Cleanup Algorithm
-```javascript
-// Priority Score = Visits × (1 + Recency Factor)
-// Keeps: High-frequency + Recently visited URLs
-// Removes: One-time visits + Old unused sites
-score = visitCount × (1 + recencyScore)
-```
-
-#### 📱 User Interface
-- **Corner Badge**: Shows visit count with hover tooltip history
-- **Menu Commands**: Access via userscript manager:
-  - 📊 Export Data (with safe DOM handling)
-  - 📈 Show Statistics (database size + cleanup info)
-  - 🗑️ Clear Current Page (instant reset to 1)
-  - 💥 Clear All Data (with confirmation)
-
-#### ⚙️ Configuration
-```javascript
-const CONFIG = {
-  MAX_VISITS_STORED: 20,     // Timestamp history per URL
-  MAX_URLS_STORED: 300,      // Database size limit
-  CLEANUP_THRESHOLD: 350,    // Auto-cleanup trigger
-  HOVER_DELAY: 200,          // Link hover delay
-  POLL_INTERVAL: 2000,       // URL change detection
-  DEBOUNCE_DELAY: 1500       // Performance optimization
-};
-```
-
-#### 🚀 Performance Optimizations
-- **Timestamp Storage**: Numbers instead of strings (~50% compression)
-- **URL Normalization**: Remove protocol/www/fragments (~40% compression)  
-- **Smart Cleanup**: Automatic database maintenance
-- **Debounced Operations**: Reduced CPU usage
-- **Safe DOM Operations**: Memory leak prevention
+- **🖱️ Link Hover Info** - Smooth tooltip with visit history and formatted timestamps
+- **⚙️ Configurable Interface** - Customizable badge position and visibility settings
 
 ---
 
-### 🔗 Other Scripts
-- `Gdrive-direct-download.user.js` - Direct download for Google Drive files
-- `Handlers-Helper-Improved.user.js` - Enhanced protocol handler management
-- `page-load-speed.user.js` - Page loading performance metrics
-- `Reject-ServiceWorker-Auto.user.js` - Automatic service worker blocking
-- `visited-improved.user.js` - Enhanced visited link tracking
+### 📁 Google Drive Direct Download - Latest
+**File:** `scripts/Gdrive-direct-download.user.js`
+
+Automatically converts Google Drive share links to direct download links, bypassing the preview page for faster file downloads.
+
+#### Features:
+- **🔗 Direct Download** - Skip Google Drive preview pages
+- **⚡ Fast Access** - Instant file downloads without extra clicks
+- **�️ Safe Operation** - Works with public Google Drive links
+- **🎯 Auto-Detection** - Automatically processes Google Drive URLs
+
+---
+
+### � Handlers Helper (Improved) - Latest  
+**File:** `scripts/Handlers-Helper-Improved.user.js`
+
+Enhanced protocol handler management with improved compatibility and user experience.
+
+#### Features:
+- **📱 Protocol Management** - Better handling of custom protocols
+- **🔄 Improved Compatibility** - Works across different browsers and websites
+- **⚙️ Enhanced Configuration** - More flexible handler setup options
+- **🛡️ Error Handling** - Robust error management for edge cases
+
+---
+
+### ⏱️ Page Load Speed Monitor - Latest
+**File:** `scripts/page-load-speed.user.js`
+
+Real-time page loading performance metrics and monitoring for web development and optimization.
+
+#### Features:
+- **� Performance Metrics** - Real-time load time measurement
+- **⚡ Speed Analysis** - Detailed breakdown of loading phases
+- **📈 Visual Indicators** - Clear performance visualization
+- **🔍 Debug Information** - Helpful data for web optimization
+
+---
+
+### 🚫 Service Worker Auto Reject - Latest
+**File:** `scripts/Reject-ServiceWorker-Auto.user.js`
+
+Automatically blocks service worker registration to prevent unwanted background processes and improve browser performance.
+
+#### Features:
+- **🛡️ Auto Blocking** - Automatic service worker prevention
+- **⚡ Performance Boost** - Reduced background processes
+- **🔧 Configurable** - Customizable blocking rules
+- **📱 Universal** - Works across all HTTPS websites
+
+---
+
+### �️ Visited Links (Improved) - Latest
+**File:** `scripts/visited-improved.user.js`
+
+Enhanced visited link tracking and visualization with improved performance and user experience.
+
+#### Features:
+- **🎨 Visual Enhancement** - Better visited link styling
+- **📊 Advanced Tracking** - Improved visit detection algorithms
+- **⚡ Performance Optimized** - Efficient link state management
+- **🔧 Customizable** - Flexible configuration options
 
 ## 📥 Installation
 
@@ -115,31 +136,31 @@ userscript-improved/
 ```
 
 ## 📊 Statistics
-- **Total Scripts**: 6
-- **Latest Version**: URL Visit Tracker v1.9.3 (Storage Optimized)
-- **Performance**: Advanced optimization with 60-70% storage reduction
+- **Total Scripts**: 6 userscripts for enhanced web browsing
+- **Featured Script**: URL Visit Tracker v1.9.9 (Advanced tracking with toggle features)
+- **Performance**: Optimized for speed with smooth animations and RAF movement
 - **Compatibility**: Modern browsers with userscript manager support
-- **Database Management**: Auto-cleanup with smart URL prioritization
+- **Database Management**: Smart cleanup with configurable badge visibility
 
-## 🔧 Recent Improvements (v1.9.3)
+## 🔧 Recent Improvements (v1.9.9)
 
-### Storage Optimization
-- **Timestamp Compression**: ~50% smaller storage using numeric timestamps
-- **URL Normalization**: ~40% reduction via protocol/www removal
-- **Auto-Cleanup**: Intelligent database maintenance under 350 URLs
-- **Smart Scoring**: Keeps important URLs based on visits × recency
+### User Interface Enhancements
+- **Toggle Badge Visibility**: Click badge or use menu command to hide/show
+- **Smooth Animations**: Improved transitions with scale effects and opacity
+- **Configurable Position**: BADGE_POSITION now properly applied from CONFIG
+- **No Menu Duplicates**: Fixed registerMenu() to prevent duplicate menu items
 
-### Performance Enhancements  
-- **Debounced Operations**: Reduced CPU usage for URL detection
-- **Safe DOM Handling**: Memory leak prevention and error handling
-- **Optimized Data Structures**: Faster access and smaller memory footprint
-- **Production Ready**: Comprehensive edge case handling
+### Performance & Animation Optimizations  
+- **RequestAnimationFrame**: Smooth tooltip movement using RAF for 60fps
+- **Optimized Event Handling**: Reduced CPU usage with smart batching
+- **Memory Management**: Proper cleanup of animation frames and pending operations
+- **Production Ready**: Enhanced error handling and edge case protection
 
-### Code Quality
-- **Zero Unused Functions**: Clean codebase with TypeScript compliance
-- **Syntax Validated**: All changes verified with Node.js syntax checking
-- **Error Handling**: Robust exception handling for all operations
-- **Backward Compatible**: Works with existing user data seamlessly
+### Code Quality & Maintenance
+- **Clean Menu System**: Static menu registration prevents Tampermonkey/Violentmonkey issues
+- **Metadata Complete**: Added homepage, updateURL, supportURL for proper distribution
+- **Modern JavaScript**: ES6+ features with backward compatibility
+- **Zero Memory Leaks**: Proper cleanup of all event listeners and animations
 
 ## 🤝 Contributing
 
@@ -170,22 +191,28 @@ This project is open source. See individual script headers for specific licensin
 
 ## 📝 Changelog
 
-### v1.9.3 (Latest) - Storage Optimization
+### v1.9.9 (Latest) - UI/UX & Performance
+- ✅ Toggle badge visibility (click or menu)
+- ✅ Smooth animations with requestAnimationFrame  
+- ✅ Fixed menu duplication issues
+- ✅ Configurable badge positioning
+- ✅ Enhanced tooltip movement performance
+
+### v1.9.8 - Menu System Fix
+- ✅ Resolved duplicate menu registration
+- ✅ Static menu items for stability
+- ✅ Improved error handling
+
+### v1.9.7 - Animation & Positioning
+- ✅ Badge toggle functionality
+- ✅ BADGE_POSITION configuration support
+- ✅ Smooth visibility transitions
+
+### v1.9.3 - Storage Optimization
 - ✅ Timestamp compression (50% storage reduction)
 - ✅ Smart auto-cleanup with priority scoring
 - ✅ Enhanced URL normalization
 - ✅ Production-ready error handling
-- ✅ Removed unused functions for cleaner code
-
-### v1.9.2 - Performance & Cleanup
-- ✅ Timestamp optimization implementation
-- ✅ Safe DOM operation enhancements
-- ✅ Syntax validation and bug fixes
-
-### v1.9.1 - Bug Fixes
-- ✅ Fixed clear data functions
-- ✅ Removed import functionality (simplified)
-- ✅ Enhanced edge case handling
 
 **See [IMPROVEMENTS.md](IMPROVEMENTS.md) for detailed changelog.**
 
