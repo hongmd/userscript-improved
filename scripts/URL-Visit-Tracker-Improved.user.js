@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    URL Visit Tracker
-// @version      1.6
+// @version      1.9
 // @description  Track visits per URL, show corner badge history & link hover info - Improved Performance
 // @match        https://*/*
 // @grant        GM_getValue
@@ -18,7 +18,8 @@
     HOVER_DELAY: 200,
     POLL_INTERVAL: 2000,
     DEBOUNCE_DELAY: 1500,
-    BADGE_POSITION: { right: '14px', bottom: '14px' }
+    BADGE_POSITION: { right: '14px', bottom: '14px' },
+    BADGE_VISIBLE: true
   };
 
   function normalizeUrl(url) {
@@ -43,6 +44,7 @@
       return {};
     }
   }
+
   function setDB(db) {
     try {
       GM_setValue('visitDB', db);
@@ -81,6 +83,7 @@
     GM_registerMenuCommand(`Last: ${lastVisit}`, () => { });
     
     GM_registerMenuCommand('📊 Export Data', exportData);
+    GM_registerMenuCommand(' Show Statistics', showStatistics);
     GM_registerMenuCommand('🗑️ Clear Current Page', clearCurrentPage);
     GM_registerMenuCommand('💥 Clear All Data', clearAllData);
   }
@@ -97,6 +100,40 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  function showStatistics() {
+    const db = getDB();
+    const urls = Object.keys(db);
+    const totalUrls = urls.length;
+    const totalVisits = urls.reduce((sum, url) => sum + db[url].count, 0);
+    
+    // Find most visited site
+    const mostVisited = urls.reduce((max, url) => 
+      db[url].count > (db[max] ? db[max].count : 0) ? url : max, '');
+    
+    // Find oldest entry
+    const oldestEntry = urls.reduce((oldest, url) => {
+      if (!db[url].visits || db[url].visits.length === 0) return oldest;
+      const lastVisit = db[url].visits[db[url].visits.length - 1];
+      if (!oldest || !db[oldest].visits || db[oldest].visits.length === 0) return url;
+      const oldestLastVisit = db[oldest].visits[db[oldest].visits.length - 1];
+      return lastVisit < oldestLastVisit ? url : oldest;
+    }, '');
+
+    const stats = `
+📈 Visit Tracker Statistics
+
+🌐 Total websites tracked: ${totalUrls}
+👆 Total visits recorded: ${totalVisits}
+🏆 Most visited: ${mostVisited} (${db[mostVisited] ? db[mostVisited].count : 0} visits)
+⏰ Oldest tracked site: ${oldestEntry}
+📅 Current page visits: ${db[currentUrl] ? db[currentUrl].count : 0}
+
+Database size: ${Math.round(JSON.stringify(db).length / 1024)} KB
+    `.trim();
+    
+    alert(stats);
   }
 
   function clearCurrentPage() {
@@ -256,10 +293,10 @@
           lastHref = location.href; 
           onUrlChange(); 
         }
-      }, 1500); // Increased from 800ms to 1500ms
+      }, CONFIG.DEBOUNCE_DELAY);
     };
     
-    setInterval(debouncedPoll, 2000);
+    setInterval(debouncedPoll, CONFIG.POLL_INTERVAL);
   }
 
   const tooltip = document.createElement('div');
