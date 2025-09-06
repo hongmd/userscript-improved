@@ -1,18 +1,18 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
-// @namespace    URL Visit Tracker
-// @version      2.0.1
+// @namespace    https://github.com/hongmd/userscript-improved
+// @version      2.0.2
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs)
 // @author       hongmd
 // @contributor  Original idea by Chewy
+// @homepage     https://github.com/hongmd/userscript-improved
 // @homepageURL  https://github.com/hongmd/userscript-improved
 // @supportURL   https://github.com/hongmd/userscript-improved/issues
+// @license      MIT
 // @match        https://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
-// @downloadURL  https://update.greasyfork.org/scripts/548595/URL%20Visit%20Tracker%20%28Improved%29.user.js
-// @updateURL    https://update.greasyfork.org/scripts/548595/URL%20Visit%20Tracker%20%28Improved%29.meta.js
 // ==/UserScript==
 
 (function () {
