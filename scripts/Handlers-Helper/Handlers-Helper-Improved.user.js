@@ -6,7 +6,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @version     4.7.2
+// @version     4.8.1
 // @author      hongmd (improved)
 // @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Fixed division by zero and YouTube navigation issues.
 // @namespace   Violentmonkey Scripts
@@ -114,9 +114,11 @@ function getParentByTagName(element, tagName) {
 
 function encodeUrl(url) {
     try {
-        return btoa(url).replace(/\//g, "_").replace(/\+/, "-").replace(/=/g, "");
+        // Validate URL before encoding
+        new URL(url);
+        return btoa(url).replace(/\//g, "_").replace(/\+/g, "-").replace(/=/g, "");
     } catch (error) {
-        console.error('URL encoding failed:', error);
+        console.error('Invalid URL provided to encodeUrl:', url, error);
         return '';
     }
 }
@@ -338,7 +340,7 @@ function executeAction(targetUrl, actionType) {
         urlString = urls.join(' ');
 
         // Reset visual indicators
-        collectedUrls.forEach((element, url) => {
+        collectedUrls.forEach((element) => {
             try {
                 element.style.boxSizing = 'unset';
                 element.style.border = 'unset';
@@ -708,18 +710,106 @@ function setupYouTubeFeatures() {
     }
 }
 
+// === ENHANCED USER FEEDBACK ===
+function showNotification(message, type = 'info', duration = 3000) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#ff4444' : type === 'success' ? '#44ff44' : '#4444ff'};
+        color: white;
+        padding: 10px 15px;
+        border-radius: 5px;
+        z-index: 10000;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    // Auto-remove after duration
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, duration);
+}
+
+// Enhanced error handling
+function handleError(error, context = '') {
+    console.error(`Handlers Helper Error${context ? ` (${context})` : ''}:`, error);
+    showNotification(`Error: ${error.message || error}`, 'error');
+}
+
+// === SETTINGS VALIDATION ===
+function validateSettings() {
+    const validActions = ['pipe', 'ytdl', 'stream', 'mpv', 'iptv', 'list'];
+    const directions = [4, 8];
+
+    // Validate action settings
+    ['UP', 'DOWN', 'LEFT', 'RIGHT'].forEach(dir => {
+        if (!validActions.includes(settings[dir])) {
+            console.warn(`Invalid ${dir} action: ${settings[dir]}, resetting to default`);
+            settings[dir] = DEFAULTS[dir];
+            GM_setValue(dir, DEFAULTS[dir]);
+        }
+    });
+
+    // Validate direction count
+    if (!directions.includes(settings.total_direction)) {
+        console.warn(`Invalid total_direction: ${settings.total_direction}, resetting to default`);
+        settings.total_direction = DEFAULTS.total_direction;
+        GM_setValue('total_direction', DEFAULTS.total_direction);
+    }
+
+    // Validate HLS domains
+    if (!settings.hlsdomain || typeof settings.hlsdomain !== 'string') {
+        console.warn('Invalid hlsdomain setting, resetting to default');
+        settings.hlsdomain = DEFAULTS.hlsdomain;
+        GM_setValue('hlsdomain', DEFAULTS.hlsdomain);
+    }
+    hlsdomainArray = settings.hlsdomain.split(',').filter(d => d.trim());
+}
+
+// === CLEANUP ON PAGE UNLOAD ===
+function cleanup() {
+    // Clear collections to free memory
+    collectedUrls.clear();
+
+    // Remove any visual indicators
+    document.querySelectorAll('[style*="border: solid yellow 4px"]').forEach(el => {
+        el.style.border = '';
+        el.style.boxSizing = '';
+    });
+
+    console.log('Handlers Helper cleanup completed');
+}
+
+// Add cleanup on page unload
+window.addEventListener('beforeunload', cleanup);
+
 // === INITIALIZATION ===
 function initialize() {
     try {
+        // Validate settings first
+        validateSettings();
+
         setupMenuCommands();
-        attachDragHandler(document);
+        attachDragHandler(document); // Use standard drag handler
         setupRightClickCollection();
         handleShadowRoots();
         setupYouTubeFeatures();
 
         console.log('Handlers Helper (Improved) initialized successfully');
+        console.log('Settings validated and loaded');
     } catch (error) {
         console.error('Initialization failed:', error);
+        handleError(error, 'initialization');
     }
 }
 
