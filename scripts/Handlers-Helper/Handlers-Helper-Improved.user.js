@@ -6,7 +6,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @version     4.8.1
+// @version     4.8.3
 // @author      hongmd (improved)
 // @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Fixed division by zero and YouTube navigation issues.
 // @namespace   Violentmonkey Scripts
@@ -38,7 +38,8 @@ const DEFAULTS = {
     hlsdomain: 'cdn.animevui.com',
     livechat: false,
     total_direction: 4,
-    down_confirm: true // New setting to confirm DOWN action
+    down_confirm: true, // New setting to confirm DOWN action
+    debug: false // Debug logging toggle
 };
 
 // Direction enum
@@ -63,14 +64,15 @@ let settings = {
     hlsdomain: GM_getValue('hlsdomain', DEFAULTS.hlsdomain),
     livechat: GM_getValue('livechat', DEFAULTS.livechat),
     total_direction: GM_getValue('total_direction', DEFAULTS.total_direction),
-    down_confirm: GM_getValue('down_confirm', DEFAULTS.down_confirm)
+    down_confirm: GM_getValue('down_confirm', DEFAULTS.down_confirm),
+    debug: GM_getValue('debug', DEFAULTS.debug)
 };
 
 let hlsdomainArray = settings.hlsdomain.split(',').filter(d => d.trim());
 let collectedUrls = new Map(); // Use Map instead of object for better performance
 let attachedElements = new WeakSet(); // Use WeakSet to prevent memory leaks
 
-console.log('Handlers Helper loaded with settings:', settings);
+debugLog('Handlers Helper loaded with settings:', settings);
 
 // === UTILITY FUNCTIONS ===
 function safePrompt(message, defaultValue) {
@@ -78,7 +80,7 @@ function safePrompt(message, defaultValue) {
         const result = window.prompt(message, defaultValue);
         return result === null ? null : result.trim();
     } catch (error) {
-        console.error('Prompt error:', error);
+        debugError('Prompt error:', error);
         return null;
     }
 }
@@ -86,14 +88,33 @@ function safePrompt(message, defaultValue) {
 function updateSetting(key, value) {
     settings[key] = value;
     GM_setValue(key, value);
-    console.log(`Updated ${key} to:`, value);
+    debugLog(`Updated ${key} to:`, value);
 }
 
 function reloadPage() {
     try {
         window.location.reload();
     } catch (error) {
-        console.error('Reload failed:', error);
+        debugError('Reload failed:', error);
+    }
+}
+
+// Optimized logging function - only logs when debug is enabled
+function debugLog(...args) {
+    if (settings.debug) {
+        console.log(...args);
+    }
+}
+
+function debugWarn(...args) {
+    if (settings.debug) {
+        console.warn(...args);
+    }
+}
+
+function debugError(...args) {
+    if (settings.debug) {
+        console.error(...args);
     }
 }
 
@@ -118,9 +139,53 @@ function encodeUrl(url) {
         new URL(url);
         return btoa(url).replace(/\//g, "_").replace(/\+/g, "-").replace(/=/g, "");
     } catch (error) {
-        console.error('Invalid URL provided to encodeUrl:', url, error);
+        debugError('Invalid URL provided to encodeUrl:', url, error);
         return '';
     }
+}
+
+// Process DOM mutations for drag handler optimization
+function processMutations(mutations) {
+    let needsUpdate = false;
+    mutations.forEach(function (mutation) {
+        if (mutation.type === 'childList') {
+            mutation.addedNodes.forEach(function (node) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const links = node.querySelectorAll ? node.querySelectorAll('a[href]') : [];
+                    if (links.length > 0) needsUpdate = true;
+                    
+                    if (node.tagName === 'A' && node.href && !node.draggable) {
+                        needsUpdate = true;
+                    }
+                }
+            });
+        }
+    });
+    
+    if (needsUpdate) {
+        makeLinksDraggable();
+    }
+}
+
+// YouTube menu command helper
+function addYouTubeMenuCommand(label, url, persistent) {
+    GM_registerMenuCommand(label, function () {
+        if (persistent) {
+            if (url.includes('m.youtube.com')) {
+                GM_setValue('hh_mobile', true);
+            } else if (url.includes('www.youtube.com')) {
+                GM_setValue('hh_mobile', false);
+            }
+        } else {
+            GM_deleteValue('hh_mobile');
+        }
+
+        try {
+            location.replace(url);
+        } catch (error) {
+            debugError('Failed to navigate:', error);
+        }
+    });
 }
 
 // === HELP AND TESTING FUNCTIONS ===
@@ -164,7 +229,7 @@ function showActionHelp() {
 }
 
 function testDirections() {
-    console.log('🧪 Testing direction detection:');
+    debugLog('🧪 Testing direction detection:');
     const tests = [
         { name: 'UP', start: [100, 100], end: [100, 50] },
         { name: 'DOWN', start: [100, 100], end: [100, 150] },
@@ -176,7 +241,7 @@ function testDirections() {
 
     tests.forEach(test => {
         const direction = getDirection(test.start[0], test.start[1], test.end[0], test.end[1]);
-        console.log(`${test.name}: (${test.start[0]},${test.start[1]}) -> (${test.end[0]},${test.end[1]}) = Direction ${direction}`);
+        debugLog(`${test.name}: (${test.start[0]},${test.start[1]}) -> (${test.end[0]},${test.end[1]}) = Direction ${direction}`);
     });
 }
 
@@ -241,6 +306,11 @@ function setupMenuCommands() {
         updateSetting('down_confirm', !settings.down_confirm);
         reloadPage();
     });
+
+    GM_registerMenuCommand(`🐛 Debug Mode: ${settings.debug ? 'ON' : 'OFF'}`, function () {
+        updateSetting('debug', !settings.debug);
+        reloadPage();
+    });
 }
 
 // === LIVE CHAT FUNCTIONS ===
@@ -258,7 +328,7 @@ function openPopout(chatUrl) {
 
         window.open(chatUrl, '', features);
     } catch (error) {
-        console.error('Failed to open popout:', error);
+        debugError('Failed to open popout:', error);
     }
 }
 
@@ -283,23 +353,23 @@ function openLiveChat(url) {
                     openPopout(`https://www.nimo.tv/popout/chat/${streamId}`);
                 }
             } catch (error) {
-                console.error('Nimo.tv chat extraction failed:', error);
+                debugError('Nimo.tv chat extraction failed:', error);
             }
         }
     } catch (error) {
-        console.error('Live chat opener failed:', error);
+        debugError('Live chat opener failed:', error);
     }
 }
 
 // === ACTION EXECUTION ===
 function executeAction(targetUrl, actionType) {
-    console.log('Executing action:', actionType, 'for URL:', targetUrl);
+    debugLog('Executing action:', actionType, 'for URL:', targetUrl);
 
     // Check if this is a DOWN action and confirmation is enabled
     if (actionType === settings.DOWN && settings.down_confirm) {
         const confirmed = confirm(`Confirm DOWN action (${actionType})?\n\nURL: ${targetUrl}\n\nClick OK to proceed or Cancel to abort.`);
         if (!confirmed) {
-            console.log('DOWN action cancelled by user');
+            debugLog('DOWN action cancelled by user');
             return;
         }
     }
@@ -326,7 +396,7 @@ function executeAction(targetUrl, actionType) {
         try {
             location.href = targetUrl;
         } catch (error) {
-            console.error('Failed to navigate to mpv URL:', error);
+            debugError('Failed to navigate to mpv URL:', error);
         }
         return;
     } else {
@@ -345,12 +415,12 @@ function executeAction(targetUrl, actionType) {
                 element.style.boxSizing = 'unset';
                 element.style.border = 'unset';
             } catch (error) {
-                console.error('Failed to reset element style:', error);
+                debugError('Failed to reset element style:', error);
             }
         });
 
         collectedUrls.clear();
-        console.log('Processed collected URLs:', urlString);
+        debugLog('Processed collected URLs:', urlString);
     } else {
         urlString = finalUrl;
     }
@@ -383,7 +453,7 @@ function executeAction(targetUrl, actionType) {
         protocolUrl += '&hls=1';
     }
 
-    console.log('Action details:', {
+    debugLog('Action details:', {
         actionType,
         app,
         finalUrl,
@@ -397,12 +467,12 @@ function executeAction(targetUrl, actionType) {
         openLiveChat(finalUrl);
     }
 
-    console.log('Final protocol URL:', protocolUrl);
+    debugLog('Final protocol URL:', protocolUrl);
 
     try {
         location.href = protocolUrl;
     } catch (error) {
-        console.error('Failed to navigate to protocol URL:', error);
+        debugError('Failed to navigate to protocol URL:', error);
     }
 }
 
@@ -411,7 +481,7 @@ function getDirection(startX, startY, endX, endY) {
     const deltaX = endX - startX;
     const deltaY = endY - startY;
 
-    console.log('Direction calculation:', {
+    debugLog('Direction calculation:', {
         start: [startX, startY],
         end: [endX, endY],
         delta: [deltaX, deltaY],
@@ -420,7 +490,7 @@ function getDirection(startX, startY, endX, endY) {
 
     // Check for center (no movement)
     if (Math.abs(deltaX) < DRAG_THRESHOLD && Math.abs(deltaY) < DRAG_THRESHOLD) {
-        console.log('Direction: CENTER (no movement)');
+        debugLog('Direction: CENTER (no movement)');
         return DirectionEnum.CENTER;
     }
 
@@ -433,12 +503,12 @@ function getDirection(startX, startY, endX, endY) {
         } else {
             direction = deltaY > 0 ? DirectionEnum.DOWN : DirectionEnum.UP;
         }
-        console.log('4-direction mode, result:', direction, direction === DirectionEnum.UP ? '(UP)' : direction === DirectionEnum.DOWN ? '(DOWN)' : direction === DirectionEnum.LEFT ? '(LEFT)' : '(RIGHT)');
+        debugLog('4-direction mode, result:', direction, direction === DirectionEnum.UP ? '(UP)' : direction === DirectionEnum.DOWN ? '(DOWN)' : direction === DirectionEnum.LEFT ? '(LEFT)' : '(RIGHT)');
     } else {
         // 8-direction mode
         if (deltaX === 0) {
             direction = deltaY > 0 ? DirectionEnum.DOWN : DirectionEnum.UP;
-            console.log('8-direction mode, vertical movement, result:', direction);
+            debugLog('8-direction mode, vertical movement, result:', direction);
         } else {
             const slope = deltaY / deltaX;
             const absSlope = Math.abs(slope);
@@ -455,7 +525,7 @@ function getDirection(startX, startY, endX, endY) {
                     direction = deltaY > 0 ? DirectionEnum.DOWN_LEFT : DirectionEnum.UP_LEFT;
                 }
             }
-            console.log('8-direction mode, slope:', slope, 'result:', direction);
+            debugLog('8-direction mode, slope:', slope, 'result:', direction);
         }
     }
 
@@ -468,28 +538,18 @@ function attachDragHandler(element) {
 
     attachedElements.add(element);
 
-    // Make sure elements are draggable
+    // Make sure elements are draggable - optimized version
     if (element === document) {
-        // For document, we need to make links draggable
+        // Use a single observer with throttling
+        let observerTimeout;
         const observer = new MutationObserver(function (mutations) {
-            mutations.forEach(function (mutation) {
-                mutation.addedNodes.forEach(function (node) {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        const links = node.querySelectorAll ? node.querySelectorAll('a') : [];
-                        links.forEach(link => {
-                            if (link.href && !link.draggable) {
-                                link.draggable = true;
-                                console.log('Made link draggable:', link.href);
-                            }
-                        });
-
-                        if (node.tagName === 'A' && node.href && !node.draggable) {
-                            node.draggable = true;
-                            console.log('Made link draggable:', node.href);
-                        }
-                    }
-                });
-            });
+            // Throttle observer updates to prevent excessive processing
+            if (observerTimeout) return;
+            
+            observerTimeout = setTimeout(() => {
+                observerTimeout = null;
+                processMutations(mutations);
+            }, 100); // 100ms throttle
         });
 
         observer.observe(document, {
@@ -497,73 +557,103 @@ function attachDragHandler(element) {
             subtree: true
         });
 
-        // Make existing links draggable
-        document.querySelectorAll('a').forEach(link => {
-            if (link.href && !link.draggable) {
-                link.draggable = true;
-                console.log('Made existing link draggable:', link.href);
-            }
-        });
-    }
+        // Initial setup
+        makeLinksDraggable();
 
-    element.addEventListener('dragstart', function (event) {
-        console.log('🚀 Drag started on element:', event.target.tagName, event.target.href || event.target.src);
-        const startX = event.clientX;
-        const startY = event.clientY;
-
-        console.log('Drag start coordinates:', startX, startY);
-
-        const handleDragEnd = function (endEvent) {
-            console.log('🏁 Drag ended');
-            const endX = endEvent.clientX;
-            const endY = endEvent.clientY;
-
-            console.log('Drag end coordinates:', endX, endY);
-
-            const direction = getDirection(startX, startY, endX, endY);
-
-            console.log(`🎯 Final drag direction: ${direction} (${startX},${startY} -> ${endX},${endY})`);
-            console.log('Current settings:', settings);
-
-            const targetHref = endEvent.target.href || endEvent.target.src;
-            if (!targetHref) {
-                console.warn('❌ No href or src found on target element');
+        // Use event delegation for drag events
+        let dragState = null;
+        
+        document.addEventListener('dragstart', function (event) {
+            const link = getDraggableLink(event.target);
+            if (!link) return;
+            
+            debugLog('🚀 Drag started on element:', event.target.tagName, link.href || event.target.src);
+            dragState = {
+                startX: event.clientX,
+                startY: event.clientY,
+                target: link
+            };
+            
+            // Prevent default drag behavior for non-draggable elements
+            if (!event.target.draggable) {
+                event.preventDefault();
                 return;
             }
+        }, { passive: true });
 
-            console.log('🔗 Target URL:', targetHref);
-
+        document.addEventListener('dragend', function (event) {
+            if (!dragState) return;
+            
+            debugLog('🏁 Drag ended');
+            const endX = event.clientX;
+            const endY = event.clientY;
+            
+            const direction = getDirection(dragState.startX, dragState.startY, endX, endY);
+            
+            debugLog(`🎯 Final drag direction: ${direction} (${dragState.startX},${dragState.startY} -> ${endX},${endY})`);
+            debugLog('Current settings:', settings);
+            
+            const targetHref = dragState.target.href || dragState.target.src;
+            if (!targetHref) {
+                debugWarn('❌ No href or src found on target element');
+                dragState = null;
+                return;
+            }
+            
+            debugLog('🔗 Target URL:', targetHref);
+            
             // Execute action based on direction
             switch (direction) {
                 case DirectionEnum.RIGHT:
-                    console.log('➡️ Executing RIGHT action:', settings.RIGHT);
+                    debugLog('➡️ Executing RIGHT action:', settings.RIGHT);
                     executeAction(targetHref, settings.RIGHT);
                     break;
                 case DirectionEnum.LEFT:
-                    console.log('⬅️ Executing LEFT action:', settings.LEFT);
+                    debugLog('⬅️ Executing LEFT action:', settings.LEFT);
                     executeAction(targetHref, settings.LEFT);
                     break;
                 case DirectionEnum.UP:
-                    console.log('⬆️ Executing UP action:', settings.UP);
+                    debugLog('⬆️ Executing UP action:', settings.UP);
                     executeAction(targetHref, settings.UP);
                     break;
                 case DirectionEnum.DOWN:
-                    console.log('⬇️ Executing DOWN action:', settings.DOWN);
+                    debugLog('⬇️ Executing DOWN action:', settings.DOWN);
                     executeAction(targetHref, settings.DOWN);
                     break;
                 case DirectionEnum.UP_LEFT:
-                    console.log('↖️ Executing UP_LEFT action: list');
+                    debugLog('↖️ Executing UP_LEFT action: list');
                     executeAction(targetHref, 'list');
                     break;
                 default:
-                    console.log('❓ Direction not mapped to action:', direction);
+                    debugLog('❓ Direction not mapped to action:', direction);
             }
+            
+            dragState = null;
+        }, { passive: true });
+    }
+}
 
-            // Cleanup
-            element.removeEventListener('dragend', handleDragEnd);
-        };
+// Helper function to find draggable link from event target
+function getDraggableLink(element) {
+    if (!element) return null;
+    
+    let current = element;
+    while (current && current !== document) {
+        if (current.tagName === 'A' && current.href) {
+            return current;
+        }
+        current = current.parentElement;
+    }
+    return null;
+}
 
-        element.addEventListener('dragend', handleDragEnd, { once: true });
+// Optimized function to make links draggable
+function makeLinksDraggable() {
+    // Use a single query and cache the result
+    const links = document.querySelectorAll('a[href]:not([draggable="true"])');
+    links.forEach(link => {
+        link.draggable = true;
+        debugLog('Made link draggable:', link.href);
     });
 }
 
@@ -618,23 +708,23 @@ function toggleUrlCollection(link, target) {
             element.style.boxSizing = 'unset';
             element.style.border = 'unset';
         } catch (error) {
-            console.error('Failed to reset element style:', error);
+            debugError('Failed to reset element style:', error);
         }
         collectedUrls.delete(link.href);
-        console.log('Removed URL from collection:', link.href);
+        debugLog('Removed URL from collection:', link.href);
     } else {
         // Add to collection
         try {
             target.style.boxSizing = 'border-box';
             target.style.border = 'solid yellow 4px';
         } catch (error) {
-            console.error('Failed to set element style:', error);
+            debugError('Failed to set element style:', error);
         }
         collectedUrls.set(link.href, target);
-        console.log('Added URL to collection:', link.href);
+        debugLog('Added URL from collection:', link.href);
     }
 
-    console.log('Current collection size:', collectedUrls.size);
+    debugLog('Current collection size:', collectedUrls.size);
 }
 
 // === SHADOW DOM AND SPECIAL FEATURES ===
@@ -651,26 +741,6 @@ function setupYouTubeFeatures() {
     if (domain !== 'www.youtube.com' && domain !== 'm.youtube.com') return;
 
     const firstChar = (location.host || '').charAt(0);
-
-    function addYouTubeMenuCommand(label, url, persistent) {
-        GM_registerMenuCommand(label, function () {
-            if (persistent) {
-                if (url.includes('m.youtube.com')) {
-                    GM_setValue('hh_mobile', true);
-                } else if (url.includes('www.youtube.com')) {
-                    GM_setValue('hh_mobile', false);
-                }
-            } else {
-                GM_deleteValue('hh_mobile');
-            }
-
-            try {
-                location.replace(url);
-            } catch (error) {
-                console.error('Failed to navigate:', error);
-            }
-        });
-    }
 
     if (firstChar === 'w') {
         addYouTubeMenuCommand(
@@ -705,7 +775,7 @@ function setupYouTubeFeatures() {
                 }
             `);
         } catch (error) {
-            console.error('Failed to apply YouTube mobile styles:', error);
+            debugError('Failed to apply YouTube mobile styles:', error);
         }
     }
 }
@@ -742,7 +812,7 @@ function showNotification(message, type = 'info', duration = 3000) {
 
 // Enhanced error handling
 function handleError(error, context = '') {
-    console.error(`Handlers Helper Error${context ? ` (${context})` : ''}:`, error);
+    debugError(`Handlers Helper Error${context ? ` (${context})` : ''}:`, error);
     showNotification(`Error: ${error.message || error}`, 'error');
 }
 
@@ -787,7 +857,7 @@ function cleanup() {
         el.style.boxSizing = '';
     });
 
-    console.log('Handlers Helper cleanup completed');
+    debugLog('Handlers Helper cleanup completed');
 }
 
 // Add cleanup on page unload
@@ -805,10 +875,10 @@ function initialize() {
         handleShadowRoots();
         setupYouTubeFeatures();
 
-        console.log('Handlers Helper (Improved) initialized successfully');
-        console.log('Settings validated and loaded');
+        debugLog('Handlers Helper (Improved) initialized successfully');
+        debugLog('Settings validated and loaded');
     } catch (error) {
-        console.error('Initialization failed:', error);
+        debugError('Initialization failed:', error);
         handleError(error, 'initialization');
     }
 }
