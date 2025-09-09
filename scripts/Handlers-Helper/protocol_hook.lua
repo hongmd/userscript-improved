@@ -50,7 +50,7 @@ end
 
 local function exedir()
     --local path1 = debug.getinfo(1).source
-    local path = mp.command_native({'expand-path', '~~home/'})
+    local path = mp.command_native({ 'expand-path', '~~home/' })
     print(path)
     path = path:gsub('/portable_config.*', '')
     print(path)
@@ -89,7 +89,7 @@ function getOS()
 	return osname or "Windows"
 end
 
-print(getOS())]]--
+print(getOS())]] --
 
 
 
@@ -111,16 +111,16 @@ local function parseqs(url)
 end
 
 local function dump(o)
-   if type(o) == 'table' then
-      local s = '{ '
-      for k,v in pairs(o) do
-         if type(k) ~= 'number' then k = '"'..k..'"' end
-         s = s .. '['..k..'] = ' .. dump(v) .. ','
-      end
-      return s .. '} '
-   else
-      return tostring(o)
-   end
+    if type(o) == 'table' then
+        local s = '{ '
+        for k, v in pairs(o) do
+            if type(k) ~= 'number' then k = '"' .. k .. '"' end
+            s = s .. '[' .. k .. '] = ' .. dump(v) .. ','
+        end
+        return s .. '} '
+    else
+        return tostring(o)
+    end
 end
 
 local function split(text, delim)
@@ -132,44 +132,44 @@ local function split(text, delim)
         delim = "%s"
     elseif string.find(delim, magic, 1, true) then
         -- escape magic
-        delim = "%"..delim
+        delim = "%" .. delim
     end
 
-    local pattern = "[^"..delim.."]+"
+    local pattern = "[^" .. delim .. "]+"
     for w in string.gmatch(text, pattern) do
         table.insert(result, w)
     end
     return result
 end
 
-local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' -- You will need this for encoding/decoding
+local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/' -- You will need this for encoding/decoding
 -- encoding
 local function enc(data)
-    return ((data:gsub('.', function(x) 
-        local r,b='',x:byte()
-        for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and '1' or '0') end
+    return ((data:gsub('.', function(x)
+        local r, b = '', x:byte()
+        for i = 8, 1, -1 do r = r .. (b % 2 ^ i - b % 2 ^ (i - 1) > 0 and '1' or '0') end
         return r;
-    end)..'0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
+    end) .. '0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
         if (#x < 6) then return '' end
-        local c=0
-        for i=1,6 do c=c+(x:sub(i,i)=='1' and 2^(6-i) or 0) end
-        return b:sub(c+1,c+1)
-    end)..({ '', '==', '=' })[#data%3+1])
+        local c = 0
+        for i = 1, 6 do c = c + (x:sub(i, i) == '1' and 2 ^ (6 - i) or 0) end
+        return b:sub(c + 1, c + 1)
+    end) .. ({ '', '==', '=' })[#data % 3 + 1])
 end
 
 -- decoding
 local function dec(data)
-    data = string.gsub(data, '[^'..b..'=]', '')
+    data = string.gsub(data, '[^' .. b .. '=]', '')
     return (data:gsub('.', function(x)
         if (x == '=') then return '' end
-        local r,f='',(b:find(x)-1)
-        for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and '1' or '0') end
+        local r, f = '', (b:find(x) - 1)
+        for i = 6, 1, -1 do r = r .. (f % 2 ^ i - f % 2 ^ (i - 1) > 0 and '1' or '0') end
         return r;
     end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
         if (#x ~= 8) then return '' end
-        local c=0
-        for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(8-i) or 0) end
-            return string.char(c)
+        local c = 0
+        for i = 1, 8 do c = c + (x:sub(i, i) == '1' and 2 ^ (8 - i) or 0) end
+        return string.char(c)
     end))
 end
 
@@ -187,7 +187,7 @@ end
 
 -- like this: str_replace = require("string-replace")
 -- return function (str, this, that) -- modify the line below for the above to work
-local function replace (str, this, that)
+local function replace(str, this, that)
     return str:gsub(regexEscape(this), that:gsub("%%", "%%%%")) -- only % needs to be escaped for 'that'
 end
 
@@ -211,8 +211,8 @@ local function escapeqs(s)
 end
 
 function magiclines(s)
-        if s:sub(-1)~="\n" then s=s.."\n" end
-        return s:gmatch("(.-)\n")
+    if s:sub(-1) ~= "\n" then s = s .. "\n" end
+    return s:gmatch("(.-)\n")
 end
 
 local function getDomain(url)
@@ -220,29 +220,29 @@ local function getDomain(url)
 end
 
 local function livestreamer(url, referer, proxy, hls)
-    print('Streamlink: '..url)
-    local url2 = '"'..url..'"'
+    print('Streamlink: ' .. url)
+    local url2 = '"' .. url .. '"'
     local cmd = ''
-    local cmd2 = url2..' '..stream_quality..' '
+    local cmd2 = url2 .. ' ' .. stream_quality .. ' '
     --local cmdconfig = ''
-    local cmdconfig = ' --config='..cwd..'/streamlink.conf'
+    local cmdconfig = ' --config=' .. cwd .. '/streamlink.conf'
     if osv == 'Windows' then
-        cmd = 'run '..cwd..'/streamlink/bin/streamlink.exe '
+        cmd = 'run ' .. cwd .. '/streamlink/bin/streamlink.exe '
     else
         cmd = 'run streamlink '
     end
     --if (url:find("hls://") == 1) then
     if (hls == true) then
-        cmdconfig = cmdconfig..' --player-args=--demuxer-lavf-format=mpegts '
+        cmdconfig = cmdconfig .. ' --player-args=--demuxer-lavf-format=mpegts '
     end
     if proxy ~= false then
-        cmd2 = cmd2..'--http-proxy='..proxy..'/'
+        cmd2 = cmd2 .. '--http-proxy=' .. proxy .. '/'
     end
     print(referer)
 
-    cmd = cmd..cmd2..cmdconfig
+    cmd = cmd .. cmd2 .. cmdconfig
     if referer ~= '' then
-        cmd = cmd..' --http-header=Referer='..referer
+        cmd = cmd .. ' --http-header=Referer=' .. referer
     end
     print(cmd)
     mp.command(cmd)
@@ -251,15 +251,15 @@ end
 
 -- Thank to pTalent: https://voz.vn/t/tong-hop-nhung-addon-chat-cho-firefox-pc-mobile.682181/post-27975348
 local function iptv(url, referer, proxy, hls)
-    print('IPTV: '..url)
-    local url2 = '"'..url..'"'
+    print('IPTV: ' .. url)
+    local url2 = '"' .. url .. '"'
     local playlist = false
     --if (url:find("hls://") == 1) then
     if (hls == true) then
         playlist = true
         --url = string.gsub(url, 'hls:', 'https:')
     end
-    
+
     local curlpath = ''
     local mpvpath = ''
     local cmdcurl = ''
@@ -270,35 +270,35 @@ local function iptv(url, referer, proxy, hls)
     print(domain)
     print(dump(split(url, '/')))
     if osv == 'Windows' then
-        curlpath = cwd..'/curl.exe '
+        curlpath = cwd .. '/curl.exe '
     else
         curlpath = 'curl '
     end
     if osv == 'Windows' then
-        mpvpath = 'run '..cwd..'/mpv.exe '
+        mpvpath = 'run ' .. cwd .. '/mpv.exe '
     else
         mpvpath = 'mpv curl '
     end
 
-	local args = {curlpath, url, "-L", '-s'}
+    local args = { curlpath, url, "-L", '-s' }
     print(dump(args))
-	local p = mp.command_native{
-		name = "subprocess",
-		capture_stdout = true,
-		playback_only = false,
-		args = args
-	}
-	if p.stdout then
+    local p = mp.command_native {
+        name = "subprocess",
+        capture_stdout = true,
+        playback_only = false,
+        args = args
+    }
+    if p.stdout then
         for line in magiclines(p.stdout) do
             if (line:find('/') == 1) then
-                stdout = stdout..'https://'..domain..line..'\n'
+                stdout = stdout .. 'https://' .. domain .. line .. '\n'
             else
-                stdout = stdout..line..'\n'
+                stdout = stdout .. line .. '\n'
             end
         end
         --stdout = string.gsub(stdout, '/hls/', 'https://'..domain..'/hls/')
         print(stdout)
-        f = io.open(cwd..'/dummy.m3u8', 'w')
+        f = io.open(cwd .. '/dummy.m3u8', 'w')
         f:write(stdout)
         f:close()
 
@@ -306,11 +306,11 @@ local function iptv(url, referer, proxy, hls)
             mp.commandv('set', 'ytdl', 'no')
             mp.commandv('set', 'prefetch-playlist', 'yes')
             mp.commandv('set', 'demuxer-lavf-format', 'mpegts')
-            mp.commandv('loadlist', cwd..'/dummy.m3u8')
+            mp.commandv('loadlist', cwd .. '/dummy.m3u8')
         else
-            mp.commandv('loadfile', cwd..'/dummy.m3u8')
+            mp.commandv('loadfile', cwd .. '/dummy.m3u8')
         end
-	end
+    end
 
     --cmdcurl = curlpath..' -L '..url2..' -o magicList.m3u8'
     --cmdmpv = mpvpath..' magicList.m3u8'
@@ -321,22 +321,22 @@ local function iptv(url, referer, proxy, hls)
 end
 
 local function mpv(url, referer, proxy, command)
-    print('MPV: '..url)
-    local url2 = '"'..url..'"'
+    print('MPV: ' .. url)
+    local url2 = '"' .. url .. '"'
     local cmd = ''
     if osv == 'Windows' then
-        cmd = 'run '..cwd..'/mpv.exe '
+        cmd = 'run ' .. cwd .. '/mpv.exe '
     else
         cmd = 'run mpv '
     end
     if proxy ~= false then
-        cmd = cmd..'--http-proxy='..proxy..'/'
+        cmd = cmd .. '--http-proxy=' .. proxy .. '/'
     end
     if command then
         url2 = string.gsub(url2, '?geometry', '?geometry2')
-        cmd = cmd..' '..command
+        cmd = cmd .. ' ' .. command
     end
-    cmd = cmd..' '..url2
+    cmd = cmd .. ' ' .. url2
 
     --print(cmd)
     mp.command(cmd)
@@ -344,40 +344,40 @@ local function mpv(url, referer, proxy, command)
 end
 
 local function EA(url, referer, app)
-    print('EA: '..url)
-    local url2 = '"'..url..'"'
-    local cmd = 'run '..app..' '..url2
+    print('EA: ' .. url)
+    local url2 = '"' .. url .. '"'
+    local cmd = 'run ' .. app .. ' ' .. url2
     mp.command(cmd)
     --mp.command('quit')
 end
 
 local function ytdl(url, referer, mode)
-    print('YTDL: '..url)
-    local url2 = '"'..url..'"'
+    print('YTDL: ' .. url)
+    local url2 = '"' .. url .. '"'
     local cmd = ''
     local cmd2 = ''
     if osv == 'Windows' then
-        cmd = 'run cmd /c cd /d '..cwd..' && start yt-dlp.exe '
+        cmd = 'run cmd /c cd /d ' .. cwd .. ' && start yt-dlp.exe '
     else
         cmd = 'run yt-dlp '
     end
     if mode == 'audio' then
         cmd2 = ' -f ba --extract-audio '
-    --else
-    --    cmd2 = ' -f bv+ba/b '
+        --else
+        --    cmd2 = ' -f bv+ba/b '
     end
-    cmd = cmd..cmd2..url2
+    cmd = cmd .. cmd2 .. url2
     mp.command(cmd)
     --mp.command('quit')
 end
 
 local function exec2(args)
-    local ret = utils.subprocess({args = args})
+    local ret = utils.subprocess({ args = args })
     return ret.status, ret.stdout, ret
 end
 
 local function gallery(url, referer)
-    local es, urls, result = exec2({"gallery-dl", "-g", url})
+    local es, urls, result = exec2({ "gallery-dl", "-g", url })
     print(urls)
     if (es < 0) or (urls == nil) or (urls == "") then
         msg.error("failed to get album list.")
@@ -387,13 +387,13 @@ local function gallery(url, referer)
 end
 
 local function ipc(url, mode)
-    local cmd = 'run cmd /c echo loadfile '..url..' '..mode..' >\\\\.\\pipe\\mpvsocket'
+    local cmd = 'run cmd /c echo loadfile ' .. url .. ' ' .. mode .. ' >\\\\.\\pipe\\mpvsocket'
     --print(cmd)
     mp.command(cmd)
 end
 
 local function piper(url, mode, proxy, hls)
-    --yt-dlp -o - https://www.douyu.com/5092355 
+    --yt-dlp -o - https://www.douyu.com/5092355
     print(proxy)
     local url = escapeqs(url)
     local playlist = false
@@ -405,13 +405,13 @@ local function piper(url, mode, proxy, hls)
     local cmd = ''
     local audiourl = ''
     local audiocmd = ''
-	local args = {'yt-dlp', '-f', 'ba', '-g', url}
+    local args = { 'yt-dlp', '-f', 'ba', '-g', url }
     local quality = '-f bv[height^>=?1080][vcodec*=?avc1]'
-    local mpvcmd =''
+    local mpvcmd = ''
     local ytdlcmd = ''
     --print(dump(args))
     if string.find(url, 'youtube.com') then
-        local p = mp.command_native{
+        local p = mp.command_native {
             name = "subprocess",
             capture_stdout = true,
             playback_only = false,
@@ -421,28 +421,28 @@ local function piper(url, mode, proxy, hls)
             audiourl = p.stdout
         end
         audiourl = escapeqs(audiourl)
-        audiocmd = ' --audio-file='..audiourl
+        audiocmd = ' --audio-file=' .. audiourl
     else
         quality = ''
         audiocmd = ''
     end
     if audiocmd ~= '' then
-        mpvcmd = mpvcmd..' '..audiocmd
+        mpvcmd = mpvcmd .. ' ' .. audiocmd
     end
     if proxy ~= false then
-        mpvcmd = mpvcmd..' '..'--http-proxy='..proxy
-        ytdlcmd = ytdlcmd..' '..'--proxy='..proxy
+        mpvcmd = mpvcmd .. ' ' .. '--http-proxy=' .. proxy
+        ytdlcmd = ytdlcmd .. ' ' .. '--proxy=' .. proxy
     end
     if playlist ~= false then
-        mpvcmd = mpvcmd..' '..'--demuxer-lavf-format=mpegts'
+        mpvcmd = mpvcmd .. ' ' .. '--demuxer-lavf-format=mpegts'
     end
     if quality ~= '' then
-        ytdlcmd = ytdlcmd..' '..quality
+        ytdlcmd = ytdlcmd .. ' ' .. quality
     end
     if osv == 'Windows' then
-        cmd = 'run cmd /c cd /d '..cwd..' && yt-dlp.exe '..ytdlcmd..' -o - '..url..' | mpv.exe -'..mpvcmd
+        cmd = 'run cmd /c cd /d ' .. cwd .. ' && yt-dlp.exe ' .. ytdlcmd .. ' -o - ' .. url .. ' | mpv.exe -' .. mpvcmd
     else
-        cmd = 'run yt-dlp '..ytdlcmd..' -o - '..url..' | mpv -'..mpvcmd
+        cmd = 'run yt-dlp ' .. ytdlcmd .. ' -o - ' .. url .. ' | mpv -' .. mpvcmd
     end
     print(cmd)
     print(cwd)
@@ -485,7 +485,7 @@ mp.add_hook("on_load", 1, function()
     local pipe = false
     local hls = false
     if osv == 'MacOS' then
-        url = 'mpv://'..url
+        url = 'mpv://' .. url
     end
     if (url:find("mpv://") ~= 1) then
         print("not a mpv url: " .. url)
@@ -561,7 +561,7 @@ mp.add_hook("on_load", 1, function()
             audio = true
         end
         if referer ~= '' then
-            mp.commandv('set', 'http-header-fields', 'Referer: '..referer)
+            mp.commandv('set', 'http-header-fields', 'Referer: ' .. referer)
         end
         if proxy ~= false then
             local ytdlrawoptions = mp.get_property_native('ytdl-raw-options', '')
@@ -569,7 +569,7 @@ mp.add_hook("on_load", 1, function()
             ytdlrawoptions['proxy'] = proxy
             --mp.commandv('set', 'http-proxy', proxy..'/')
             --mp.commandv('set', 'ytdl-raw-options', 'proxy='..proxy..','..ytdlrawoptions)
-            mp.set_property('http-proxy', proxy..'/')
+            mp.set_property('http-proxy', proxy .. '/')
             --mp.set_property('ytdl-raw-options', 'proxy='..proxy..','..ytdlrawoptions)
             mp.set_property_native('ytdl-raw-options', ytdlrawoptions)
             --local ytdlrawoptions = mp.get_property_native('ytdl-raw-options', '')
@@ -590,15 +590,13 @@ mp.add_hook("on_load", 1, function()
                     return
                 end
                 if qs['geometry'] and nogeometry == false then
-                    mpv(ourl, referer, proxy, '--geometry='..qs['geometry'])
+                    mpv(ourl, referer, proxy, '--geometry=' .. qs['geometry'])
                     return
                 end
                 if autopip == true then
                     ipc(ourl, 'replace')
                 else
                     for link in string.gmatch(url, "[^%s]+") do
-
-                        
                         if hook_count > 0 then
                             mode = 'replace'
                         end
@@ -648,4 +646,3 @@ mp.add_hook("on_load", 1, function()
         hook_count = hook_count + 1
     end
 end)
-
