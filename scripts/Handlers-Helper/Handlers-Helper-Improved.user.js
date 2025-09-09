@@ -6,7 +6,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @version     4.7
+// @version     4.8
 // @author      hongmd (improved)
 // @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Fixed division by zero and YouTube navigation issues.
 // @namespace   Violentmonkey Scripts
@@ -233,10 +233,10 @@ function getParentByTagName(element, tagName) {
     return null;
 }
 
-// Base64 URL encoding
+// URL-safe encoding for protocol parameters (no Base64)
 function encodeUrl(url) {
     try {
-        return btoa(url).replace(/\//g, "_").replace(/\+/g, "-").replace(/=/g, "");
+        return encodeURIComponent(url);
     } catch (error) {
         console.error('URL encoding failed:', error);
         return '';
@@ -309,12 +309,9 @@ function executeAction(targetUrl, actionType) {
     let app = 'play';
     let isHls = false;
     
-    // Check HLS domains
+    // Check HLS domains (do not rewrite protocol; pass flag only)
     for (const domain of hlsdomainArray) {
         if (domain && (targetUrl.includes(domain) || document.domain.includes(domain))) {
-            if (actionType === 'stream') {
-                targetUrl = targetUrl.replace(/^https?:/, 'hls:');
-            }
             isHls = true;
             break;
         }
@@ -375,10 +372,10 @@ function executeAction(targetUrl, actionType) {
             app = actionType; // Pass through custom actions
     }
     
-    // Build final URL
+    // Build final URL (query params per protocol_hook.lua)
     const encodedUrl = encodeUrl(urlString);
     const encodedReferer = encodeUrl(location.href);
-    let protocolUrl = `mpv://${app}/${encodedUrl}/?referer=${encodedReferer}`;
+    let protocolUrl = `mpv://${app}/?url=${encodedUrl}&referer=${encodedReferer}`;
     
     if (isHls) {
         protocolUrl += '&hls=1';
