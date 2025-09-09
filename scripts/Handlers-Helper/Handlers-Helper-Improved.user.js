@@ -6,7 +6,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @version     4.8.5
+// @version     4.8.6
 // @author      hongmd (improved)
 // @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Fixed division by zero and YouTube navigation issues.
 // @namespace   Violentmonkey Scripts
@@ -71,6 +71,14 @@ let settings = {
 let hlsdomainArray = settings.hlsdomain.split(',').filter(d => d.trim());
 let collectedUrls = new Map(); // Use Map instead of object for better performance
 let attachedElements = new WeakSet(); // Use WeakSet to prevent memory leaks
+
+// Add CSS class for collected links styling
+GM_addStyle(`
+    .hh-collected-link {
+        box-sizing: border-box !important;
+        border: solid yellow 4px !important;
+    }
+`);
 
 debugLog('Handlers Helper loaded with settings:', settings);
 
@@ -137,7 +145,9 @@ function encodeUrl(url) {
     try {
         // Validate URL before encoding
         new URL(url);
-        return btoa(url).replace(/\//g, "_").replace(/\+/g, "-").replace(/=/g, "");
+        return btoa(url).replace(/[/+=]/g, match => 
+            match === '/' ? '_' : match === '+' ? '-' : ''
+        );
     } catch (error) {
         debugError('Invalid URL provided to encodeUrl:', url, error);
         return '';
@@ -412,10 +422,9 @@ function executeAction(targetUrl, actionType) {
         // Reset visual indicators
         collectedUrls.forEach((element) => {
             try {
-                element.style.boxSizing = 'unset';
-                element.style.border = 'unset';
+                element.classList.remove('hh-collected-link');
             } catch (error) {
-                debugError('Failed to reset element style:', error);
+                debugError('Failed to reset element class:', error);
             }
         });
 
@@ -705,20 +714,18 @@ function toggleUrlCollection(link, target) {
         // Remove from collection
         const element = collectedUrls.get(link.href);
         try {
-            element.style.boxSizing = 'unset';
-            element.style.border = 'unset';
+            element.classList.remove('hh-collected-link');
         } catch (error) {
-            debugError('Failed to reset element style:', error);
+            debugError('Failed to remove collected link class:', error);
         }
         collectedUrls.delete(link.href);
         debugLog('Removed URL from collection:', link.href);
     } else {
         // Add to collection
         try {
-            target.style.boxSizing = 'border-box';
-            target.style.border = 'solid yellow 4px';
+            target.classList.add('hh-collected-link');
         } catch (error) {
-            debugError('Failed to set element style:', error);
+            debugError('Failed to add collected link class:', error);
         }
         collectedUrls.set(link.href, target);
         debugLog('Added URL from collection:', link.href);
@@ -786,9 +793,8 @@ function cleanup() {
     collectedUrls.clear();
 
     // Remove any visual indicators
-    document.querySelectorAll('[style*="border: solid yellow 4px"]').forEach(el => {
-        el.style.border = '';
-        el.style.boxSizing = '';
+    document.querySelectorAll('.hh-collected-link').forEach(el => {
+        el.classList.remove('hh-collected-link');
     });
 
     debugLog('Handlers Helper cleanup completed');
