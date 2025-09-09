@@ -6,7 +6,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @version     4.8.3
+// @version     4.8.5
 // @author      hongmd (improved)
 // @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Fixed division by zero and YouTube navigation issues.
 // @namespace   Violentmonkey Scripts
@@ -153,7 +153,7 @@ function processMutations(mutations) {
                 if (node.nodeType === Node.ELEMENT_NODE) {
                     const links = node.querySelectorAll ? node.querySelectorAll('a[href]') : [];
                     if (links.length > 0) needsUpdate = true;
-                    
+
                     if (node.tagName === 'A' && node.href && !node.draggable) {
                         needsUpdate = true;
                     }
@@ -161,7 +161,7 @@ function processMutations(mutations) {
             });
         }
     });
-    
+
     if (needsUpdate) {
         makeLinksDraggable();
     }
@@ -545,7 +545,7 @@ function attachDragHandler(element) {
         const observer = new MutationObserver(function (mutations) {
             // Throttle observer updates to prevent excessive processing
             if (observerTimeout) return;
-            
+
             observerTimeout = setTimeout(() => {
                 observerTimeout = null;
                 processMutations(mutations);
@@ -562,18 +562,18 @@ function attachDragHandler(element) {
 
         // Use event delegation for drag events
         let dragState = null;
-        
+
         document.addEventListener('dragstart', function (event) {
             const link = getDraggableLink(event.target);
             if (!link) return;
-            
+
             debugLog('🚀 Drag started on element:', event.target.tagName, link.href || event.target.src);
             dragState = {
                 startX: event.clientX,
                 startY: event.clientY,
                 target: link
             };
-            
+
             // Prevent default drag behavior for non-draggable elements
             if (!event.target.draggable) {
                 event.preventDefault();
@@ -583,25 +583,25 @@ function attachDragHandler(element) {
 
         document.addEventListener('dragend', function (event) {
             if (!dragState) return;
-            
+
             debugLog('🏁 Drag ended');
             const endX = event.clientX;
             const endY = event.clientY;
-            
+
             const direction = getDirection(dragState.startX, dragState.startY, endX, endY);
-            
+
             debugLog(`🎯 Final drag direction: ${direction} (${dragState.startX},${dragState.startY} -> ${endX},${endY})`);
             debugLog('Current settings:', settings);
-            
+
             const targetHref = dragState.target.href || dragState.target.src;
             if (!targetHref) {
                 debugWarn('❌ No href or src found on target element');
                 dragState = null;
                 return;
             }
-            
+
             debugLog('🔗 Target URL:', targetHref);
-            
+
             // Execute action based on direction
             switch (direction) {
                 case DirectionEnum.RIGHT:
@@ -627,7 +627,7 @@ function attachDragHandler(element) {
                 default:
                     debugLog('❓ Direction not mapped to action:', direction);
             }
-            
+
             dragState = null;
         }, { passive: true });
     }
@@ -636,7 +636,7 @@ function attachDragHandler(element) {
 // Helper function to find draggable link from event target
 function getDraggableLink(element) {
     if (!element) return null;
-    
+
     let current = element;
     while (current && current !== document) {
         if (current.tagName === 'A' && current.href) {
@@ -780,72 +780,6 @@ function setupYouTubeFeatures() {
     }
 }
 
-// === ENHANCED USER FEEDBACK ===
-function showNotification(message, type = 'info', duration = 3000) {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'error' ? '#ff4444' : type === 'success' ? '#44ff44' : '#4444ff'};
-        color: white;
-        padding: 10px 15px;
-        border-radius: 5px;
-        z-index: 10000;
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        max-width: 300px;
-        word-wrap: break-word;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-
-    // Auto-remove after duration
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
-        }
-    }, duration);
-}
-
-// Enhanced error handling
-function handleError(error, context = '') {
-    debugError(`Handlers Helper Error${context ? ` (${context})` : ''}:`, error);
-    showNotification(`Error: ${error.message || error}`, 'error');
-}
-
-// === SETTINGS VALIDATION ===
-function validateSettings() {
-    const validActions = ['pipe', 'ytdl', 'stream', 'mpv', 'iptv', 'list'];
-    const directions = [4, 8];
-
-    // Validate action settings
-    ['UP', 'DOWN', 'LEFT', 'RIGHT'].forEach(dir => {
-        if (!validActions.includes(settings[dir])) {
-            console.warn(`Invalid ${dir} action: ${settings[dir]}, resetting to default`);
-            settings[dir] = DEFAULTS[dir];
-            GM_setValue(dir, DEFAULTS[dir]);
-        }
-    });
-
-    // Validate direction count
-    if (!directions.includes(settings.total_direction)) {
-        console.warn(`Invalid total_direction: ${settings.total_direction}, resetting to default`);
-        settings.total_direction = DEFAULTS.total_direction;
-        GM_setValue('total_direction', DEFAULTS.total_direction);
-    }
-
-    // Validate HLS domains
-    if (!settings.hlsdomain || typeof settings.hlsdomain !== 'string') {
-        console.warn('Invalid hlsdomain setting, resetting to default');
-        settings.hlsdomain = DEFAULTS.hlsdomain;
-        GM_setValue('hlsdomain', DEFAULTS.hlsdomain);
-    }
-    hlsdomainArray = settings.hlsdomain.split(',').filter(d => d.trim());
-}
-
 // === CLEANUP ON PAGE UNLOAD ===
 function cleanup() {
     // Clear collections to free memory
@@ -866,9 +800,6 @@ window.addEventListener('beforeunload', cleanup);
 // === INITIALIZATION ===
 function initialize() {
     try {
-        // Validate settings first
-        validateSettings();
-
         setupMenuCommands();
         attachDragHandler(document); // Use standard drag handler
         setupRightClickCollection();
@@ -879,7 +810,6 @@ function initialize() {
         debugLog('Settings validated and loaded');
     } catch (error) {
         debugError('Initialization failed:', error);
-        handleError(error, 'initialization');
     }
 }
 
