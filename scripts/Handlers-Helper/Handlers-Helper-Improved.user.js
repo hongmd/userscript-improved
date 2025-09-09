@@ -6,7 +6,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @version     4.7
+// @version     4.7.1
 // @author      hongmd (improved)
 // @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Fixed division by zero and YouTube navigation issues.
 // @namespace   Violentmonkey Scripts
@@ -14,7 +14,7 @@
 
 'use strict';
 
-// Constants
+// === CONSTANTS AND DEFAULTS ===
 const GUIDE = 'Value: pipe ytdl stream mpv iptv';
 
 /* ACTION EXPLANATIONS:
@@ -41,25 +41,6 @@ const DEFAULTS = {
     down_confirm: true // New setting to confirm DOWN action
 };
 
-// Initialize settings (fixed variable redeclaration)
-let settings = {
-    UP: GM_getValue('UP', DEFAULTS.UP),
-    DOWN: GM_getValue('DOWN', DEFAULTS.DOWN),
-    LEFT: GM_getValue('LEFT', DEFAULTS.LEFT),
-    RIGHT: GM_getValue('RIGHT', DEFAULTS.RIGHT),
-    hlsdomain: GM_getValue('hlsdomain', DEFAULTS.hlsdomain),
-    livechat: GM_getValue('livechat', DEFAULTS.livechat),
-    total_direction: GM_getValue('total_direction', DEFAULTS.total_direction),
-    down_confirm: GM_getValue('down_confirm', DEFAULTS.down_confirm)
-};
-
-// Global state
-let hlsdomainArray = settings.hlsdomain.split(',').filter(d => d.trim());
-let collectedUrls = new Map(); // Use Map instead of object for better performance
-let attachedElements = new WeakSet(); // Use WeakSet to prevent memory leaks
-
-console.log('Handlers Helper loaded with settings:', settings);
-
 // Direction enum
 const DirectionEnum = Object.freeze({
     CENTER: 5,
@@ -73,7 +54,25 @@ const DirectionEnum = Object.freeze({
     DOWN_RIGHT: 9
 });
 
-// Utility functions
+// === GLOBAL STATE ===
+let settings = {
+    UP: GM_getValue('UP', DEFAULTS.UP),
+    DOWN: GM_getValue('DOWN', DEFAULTS.DOWN),
+    LEFT: GM_getValue('LEFT', DEFAULTS.LEFT),
+    RIGHT: GM_getValue('RIGHT', DEFAULTS.RIGHT),
+    hlsdomain: GM_getValue('hlsdomain', DEFAULTS.hlsdomain),
+    livechat: GM_getValue('livechat', DEFAULTS.livechat),
+    total_direction: GM_getValue('total_direction', DEFAULTS.total_direction),
+    down_confirm: GM_getValue('down_confirm', DEFAULTS.down_confirm)
+};
+
+let hlsdomainArray = settings.hlsdomain.split(',').filter(d => d.trim());
+let collectedUrls = new Map(); // Use Map instead of object for better performance
+let attachedElements = new WeakSet(); // Use WeakSet to prevent memory leaks
+
+console.log('Handlers Helper loaded with settings:', settings);
+
+// === UTILITY FUNCTIONS ===
 function safePrompt(message, defaultValue) {
     try {
         const result = window.prompt(message, defaultValue);
@@ -98,6 +97,31 @@ function reloadPage() {
     }
 }
 
+function getParentByTagName(element, tagName) {
+    if (!element || typeof tagName !== 'string') return null;
+    
+    tagName = tagName.toLowerCase();
+    let current = element;
+    
+    while (current && current.nodeType === Node.ELEMENT_NODE) {
+        if (current.tagName && current.tagName.toLowerCase() === tagName) {
+            return current;
+        }
+        current = current.parentNode;
+    }
+    return null;
+}
+
+function encodeUrl(url) {
+    try {
+        return btoa(url).replace(/\//g, "_").replace(/\+/, "-").replace(/=/g, "");
+    } catch (error) {
+        console.error('URL encoding failed:', error);
+        return '';
+    }
+}
+
+// === HELP AND TESTING FUNCTIONS ===
 function showActionHelp() {
     const helpText = `🎮 DRAG DIRECTIONS & ACTIONS:
 
@@ -154,7 +178,7 @@ function testDirections() {
     });
 }
 
-// Menu commands with improved validation
+// === MENU COMMANDS SETUP ===
 function setupMenuCommands() {
     // Help command first
     GM_registerMenuCommand('❓ Show Action Help', showActionHelp);
@@ -217,33 +241,7 @@ function setupMenuCommands() {
     });
 }
 
-// Utility function to find parent by tag name
-function getParentByTagName(element, tagName) {
-    if (!element || typeof tagName !== 'string') return null;
-    
-    tagName = tagName.toLowerCase();
-    let current = element;
-    
-    while (current && current.nodeType === Node.ELEMENT_NODE) {
-        if (current.tagName && current.tagName.toLowerCase() === tagName) {
-            return current;
-        }
-        current = current.parentNode;
-    }
-    return null;
-}
-
-// Base64 URL encoding
-function encodeUrl(url) {
-    try {
-        return btoa(url).replace(/\//g, "_").replace(/\+/g, "-").replace(/=/g, "");
-    } catch (error) {
-        console.error('URL encoding failed:', error);
-        return '';
-    }
-}
-
-// Popup window for live chat
+// === LIVE CHAT FUNCTIONS ===
 function openPopout(chatUrl) {
     try {
         const features = [
@@ -262,7 +260,6 @@ function openPopout(chatUrl) {
     }
 }
 
-// Live chat opener with improved error handling
 function openLiveChat(url) {
     try {
         const urlObj = new URL(url);
@@ -292,7 +289,7 @@ function openLiveChat(url) {
     }
 }
 
-// Enhanced action handler
+// === ACTION EXECUTION ===
 function executeAction(targetUrl, actionType) {
     console.log('Executing action:', actionType, 'for URL:', targetUrl);
     
@@ -407,7 +404,7 @@ function executeAction(targetUrl, actionType) {
     }
 }
 
-// Direction calculation
+// === DIRECTION CALCULATION ===
 function getDirection(startX, startY, endX, endY) {
     const deltaX = endX - startX;
     const deltaY = endY - startY;
@@ -463,7 +460,7 @@ function getDirection(startX, startY, endX, endY) {
     return direction;
 }
 
-// Enhanced drag handler
+// === DRAG HANDLING ===
 function attachDragHandler(element) {
     if (!element || attachedElements.has(element)) return;
     
@@ -568,7 +565,7 @@ function attachDragHandler(element) {
     });
 }
 
-// Enhanced right-click collection
+// === RIGHT-CLICK COLLECTION ===
 function setupRightClickCollection() {
     let mouseIsDown = false;
     let isHeld = false;
@@ -609,7 +606,6 @@ function setupRightClickCollection() {
     });
 }
 
-// URL collection toggle
 function toggleUrlCollection(link, target) {
     if (!link.href) return;
     
@@ -639,7 +635,7 @@ function toggleUrlCollection(link, target) {
     console.log('Current collection size:', collectedUrls.size);
 }
 
-// Shadow DOM handler
+// === SHADOW DOM AND SPECIAL FEATURES ===
 function handleShadowRoots() {
     document.addEventListener('mouseover', function(event) {
         if (event.target.shadowRoot && !attachedElements.has(event.target)) {
@@ -648,7 +644,6 @@ function handleShadowRoots() {
     });
 }
 
-// YouTube-specific enhancements
 function setupYouTubeFeatures() {
     const domain = document.domain;
     if (domain !== 'www.youtube.com' && domain !== 'm.youtube.com') return;
@@ -714,7 +709,7 @@ function setupYouTubeFeatures() {
     }
 }
 
-// Initialize everything
+// === INITIALIZATION ===
 function initialize() {
     try {
         setupMenuCommands();
