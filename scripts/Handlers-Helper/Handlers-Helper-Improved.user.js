@@ -6,7 +6,7 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @version     4.7.1
+// @version     4.7.2
 // @author      hongmd (improved)
 // @description Helper for protocol_hook.lua - Fixed bugs, improved performance and reliability. Fixed division by zero and YouTube navigation issues.
 // @namespace   Violentmonkey Scripts
@@ -99,10 +99,10 @@ function reloadPage() {
 
 function getParentByTagName(element, tagName) {
     if (!element || typeof tagName !== 'string') return null;
-    
+
     tagName = tagName.toLowerCase();
     let current = element;
-    
+
     while (current && current.nodeType === Node.ELEMENT_NODE) {
         if (current.tagName && current.tagName.toLowerCase() === tagName) {
             return current;
@@ -171,7 +171,7 @@ function testDirections() {
         { name: 'UP-LEFT', start: [100, 100], end: [50, 50] },
         { name: 'NO MOVEMENT', start: [100, 100], end: [105, 105] }
     ];
-    
+
     tests.forEach(test => {
         const direction = getDirection(test.start[0], test.start[1], test.end[0], test.end[1]);
         console.log(`${test.name}: (${test.start[0]},${test.start[1]}) -> (${test.end[0]},${test.end[1]}) = Direction ${direction}`);
@@ -183,59 +183,59 @@ function setupMenuCommands() {
     // Help command first
     GM_registerMenuCommand('❓ Show Action Help', showActionHelp);
     GM_registerMenuCommand('🧪 Test Directions', testDirections);
-    
-    GM_registerMenuCommand(`📺 UP: ${settings.UP}`, function() {
+
+    GM_registerMenuCommand(`📺 UP: ${settings.UP}`, function () {
         const value = safePrompt(GUIDE + '\n\n↑ UP Action (pipe = stream to MPV with yt-dlp)', settings.UP);
         if (value) {
             updateSetting('UP', value);
             reloadPage();
         }
     });
-    
-    GM_registerMenuCommand(`📥 DOWN: ${settings.DOWN}`, function() {
+
+    GM_registerMenuCommand(`📥 DOWN: ${settings.DOWN}`, function () {
         const value = safePrompt(GUIDE + '\n\n↓ DOWN Action (ytdl = download with yt-dlp)', settings.DOWN);
         if (value) {
             updateSetting('DOWN', value);
             reloadPage();
         }
     });
-    
-    GM_registerMenuCommand(`🌊 LEFT: ${settings.LEFT}`, function() {
+
+    GM_registerMenuCommand(`🌊 LEFT: ${settings.LEFT}`, function () {
         const value = safePrompt(GUIDE + '\n\n← LEFT Action (stream = use streamlink)', settings.LEFT);
         if (value) {
             updateSetting('LEFT', value);
             reloadPage();
         }
     });
-    
-    GM_registerMenuCommand(`▶️ RIGHT: ${settings.RIGHT}`, function() {
+
+    GM_registerMenuCommand(`▶️ RIGHT: ${settings.RIGHT}`, function () {
         const value = safePrompt(GUIDE + '\n\n→ RIGHT Action (mpv = direct play)', settings.RIGHT);
         if (value) {
             updateSetting('RIGHT', value);
             reloadPage();
         }
     });
-    
-    GM_registerMenuCommand('HLS Domains', function() {
+
+    GM_registerMenuCommand('HLS Domains', function () {
         const value = safePrompt('Example: 1.com,2.com,3.com,4.com', settings.hlsdomain);
         if (value !== null) {
             updateSetting('hlsdomain', value);
             hlsdomainArray = value.split(',').filter(d => d.trim());
         }
     });
-    
-    GM_registerMenuCommand(`Live Chat: ${settings.livechat}`, function() {
+
+    GM_registerMenuCommand(`Live Chat: ${settings.livechat}`, function () {
         updateSetting('livechat', !settings.livechat);
         reloadPage();
     });
-    
-    GM_registerMenuCommand(`Directions: ${settings.total_direction}`, function() {
+
+    GM_registerMenuCommand(`Directions: ${settings.total_direction}`, function () {
         const newValue = settings.total_direction === 4 ? 8 : 4;
         updateSetting('total_direction', newValue);
         reloadPage();
     });
-    
-    GM_registerMenuCommand(`DOWN Confirm: ${settings.down_confirm ? 'ON' : 'OFF'}`, function() {
+
+    GM_registerMenuCommand(`DOWN Confirm: ${settings.down_confirm ? 'ON' : 'OFF'}`, function () {
         updateSetting('down_confirm', !settings.down_confirm);
         reloadPage();
     });
@@ -246,14 +246,14 @@ function openPopout(chatUrl) {
     try {
         const features = [
             'fullscreen=no',
-            'toolbar=no', 
+            'toolbar=no',
             'titlebar=no',
             'menubar=no',
             'location=no',
             `width=${LIVE_WINDOW_WIDTH}`,
             `height=${LIVE_WINDOW_HEIGHT}`
         ].join(',');
-        
+
         window.open(chatUrl, '', features);
     } catch (error) {
         console.error('Failed to open popout:', error);
@@ -264,7 +264,7 @@ function openLiveChat(url) {
     try {
         const urlObj = new URL(url);
         const href = urlObj.href;
-        
+
         if (href.includes('www.youtube.com/watch') || href.includes('m.youtube.com/watch')) {
             const videoId = urlObj.searchParams.get('v');
             if (videoId) {
@@ -292,7 +292,7 @@ function openLiveChat(url) {
 // === ACTION EXECUTION ===
 function executeAction(targetUrl, actionType) {
     console.log('Executing action:', actionType, 'for URL:', targetUrl);
-    
+
     // Check if this is a DOWN action and confirmation is enabled
     if (actionType === settings.DOWN && settings.down_confirm) {
         const confirmed = confirm(`Confirm DOWN action (${actionType})?\n\nURL: ${targetUrl}\n\nClick OK to proceed or Cancel to abort.`);
@@ -301,11 +301,11 @@ function executeAction(targetUrl, actionType) {
             return;
         }
     }
-    
+
     let finalUrl = '';
     let app = 'play';
     let isHls = false;
-    
+
     // Check HLS domains
     for (const domain of hlsdomainArray) {
         if (domain && (targetUrl.includes(domain) || document.domain.includes(domain))) {
@@ -316,7 +316,7 @@ function executeAction(targetUrl, actionType) {
             break;
         }
     }
-    
+
     // Handle different URL types
     if (targetUrl.startsWith('http') || targetUrl.startsWith('hls:')) {
         finalUrl = targetUrl;
@@ -330,13 +330,13 @@ function executeAction(targetUrl, actionType) {
     } else {
         finalUrl = location.href;
     }
-    
+
     // Process collected URLs
     let urlString = '';
     if (collectedUrls.size > 0) {
         const urls = Array.from(collectedUrls.keys());
         urlString = urls.join(' ');
-        
+
         // Reset visual indicators
         collectedUrls.forEach((element, url) => {
             try {
@@ -346,13 +346,13 @@ function executeAction(targetUrl, actionType) {
                 console.error('Failed to reset element style:', error);
             }
         });
-        
+
         collectedUrls.clear();
         console.log('Processed collected URLs:', urlString);
     } else {
         urlString = finalUrl;
     }
-    
+
     // Determine app type and protocol action
     switch (actionType) {
         case 'pipe':
@@ -371,16 +371,16 @@ function executeAction(targetUrl, actionType) {
         default:
             app = actionType; // Pass through custom actions
     }
-    
+
     // Build final URL
     const encodedUrl = encodeUrl(urlString);
     const encodedReferer = encodeUrl(location.href);
     let protocolUrl = `mpv://${app}/${encodedUrl}/?referer=${encodedReferer}`;
-    
+
     if (isHls) {
         protocolUrl += '&hls=1';
     }
-    
+
     console.log('Action details:', {
         actionType,
         app,
@@ -389,14 +389,14 @@ function executeAction(targetUrl, actionType) {
         isHls,
         protocolUrl
     });
-    
+
     // Open live chat if needed
     if (actionType === 'stream' && settings.livechat) {
         openLiveChat(finalUrl);
     }
-    
+
     console.log('Final protocol URL:', protocolUrl);
-    
+
     try {
         location.href = protocolUrl;
     } catch (error) {
@@ -408,22 +408,22 @@ function executeAction(targetUrl, actionType) {
 function getDirection(startX, startY, endX, endY) {
     const deltaX = endX - startX;
     const deltaY = endY - startY;
-    
+
     console.log('Direction calculation:', {
         start: [startX, startY],
         end: [endX, endY],
         delta: [deltaX, deltaY],
         threshold: DRAG_THRESHOLD
     });
-    
+
     // Check for center (no movement)
     if (Math.abs(deltaX) < DRAG_THRESHOLD && Math.abs(deltaY) < DRAG_THRESHOLD) {
         console.log('Direction: CENTER (no movement)');
         return DirectionEnum.CENTER;
     }
-    
+
     let direction;
-    
+
     if (settings.total_direction === 4) {
         // 4-direction mode
         if (Math.abs(deltaX) > Math.abs(deltaY)) {
@@ -440,7 +440,7 @@ function getDirection(startX, startY, endX, endY) {
         } else {
             const slope = deltaY / deltaX;
             const absSlope = Math.abs(slope);
-            
+
             if (absSlope < 0.4142) { // ~22.5 degrees
                 direction = deltaX > 0 ? DirectionEnum.RIGHT : DirectionEnum.LEFT;
             } else if (absSlope > 2.4142) { // ~67.5 degrees
@@ -456,22 +456,22 @@ function getDirection(startX, startY, endX, endY) {
             console.log('8-direction mode, slope:', slope, 'result:', direction);
         }
     }
-    
+
     return direction;
 }
 
 // === DRAG HANDLING ===
 function attachDragHandler(element) {
     if (!element || attachedElements.has(element)) return;
-    
+
     attachedElements.add(element);
-    
+
     // Make sure elements are draggable
     if (element === document) {
         // For document, we need to make links draggable
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                mutation.addedNodes.forEach(function(node) {
+        const observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                mutation.addedNodes.forEach(function (node) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
                         const links = node.querySelectorAll ? node.querySelectorAll('a') : [];
                         links.forEach(link => {
@@ -480,7 +480,7 @@ function attachDragHandler(element) {
                                 console.log('Made link draggable:', link.href);
                             }
                         });
-                        
+
                         if (node.tagName === 'A' && node.href && !node.draggable) {
                             node.draggable = true;
                             console.log('Made link draggable:', node.href);
@@ -489,12 +489,12 @@ function attachDragHandler(element) {
                 });
             });
         });
-        
+
         observer.observe(document, {
             childList: true,
             subtree: true
         });
-        
+
         // Make existing links draggable
         document.querySelectorAll('a').forEach(link => {
             if (link.href && !link.draggable) {
@@ -503,34 +503,34 @@ function attachDragHandler(element) {
             }
         });
     }
-    
-    element.addEventListener('dragstart', function(event) {
+
+    element.addEventListener('dragstart', function (event) {
         console.log('🚀 Drag started on element:', event.target.tagName, event.target.href || event.target.src);
         const startX = event.clientX;
         const startY = event.clientY;
-        
+
         console.log('Drag start coordinates:', startX, startY);
-        
-        const handleDragEnd = function(endEvent) {
+
+        const handleDragEnd = function (endEvent) {
             console.log('🏁 Drag ended');
             const endX = endEvent.clientX;
             const endY = endEvent.clientY;
-            
+
             console.log('Drag end coordinates:', endX, endY);
-            
+
             const direction = getDirection(startX, startY, endX, endY);
-            
+
             console.log(`🎯 Final drag direction: ${direction} (${startX},${startY} -> ${endX},${endY})`);
             console.log('Current settings:', settings);
-            
+
             const targetHref = endEvent.target.href || endEvent.target.src;
             if (!targetHref) {
                 console.warn('❌ No href or src found on target element');
                 return;
             }
-            
+
             console.log('🔗 Target URL:', targetHref);
-            
+
             // Execute action based on direction
             switch (direction) {
                 case DirectionEnum.RIGHT:
@@ -556,11 +556,11 @@ function attachDragHandler(element) {
                 default:
                     console.log('❓ Direction not mapped to action:', direction);
             }
-            
+
             // Cleanup
             element.removeEventListener('dragend', handleDragEnd);
         };
-        
+
         element.addEventListener('dragend', handleDragEnd, { once: true });
     });
 }
@@ -569,33 +569,33 @@ function attachDragHandler(element) {
 function setupRightClickCollection() {
     let mouseIsDown = false;
     let isHeld = false;
-    
-    document.addEventListener('mousedown', function(event) {
+
+    document.addEventListener('mousedown', function (event) {
         const link = getParentByTagName(event.target, 'A');
         if (!link) return;
-        
+
         mouseIsDown = true;
-        
+
         // Cleanup listeners
-        const handleMouseUp = function() {
+        const handleMouseUp = function () {
             mouseIsDown = false;
             document.removeEventListener('mouseup', handleMouseUp);
         };
-        
-        const handleContextMenu = function(contextEvent) {
+
+        const handleContextMenu = function (contextEvent) {
             if (isHeld) {
                 contextEvent.preventDefault();
                 isHeld = false;
             }
             document.removeEventListener('contextmenu', handleContextMenu);
         };
-        
+
         document.addEventListener('mouseup', handleMouseUp, { once: true });
         document.addEventListener('contextmenu', handleContextMenu, { once: true });
-        
+
         // Handle right-click
         if (event.button === 2) {
-            setTimeout(function() {
+            setTimeout(function () {
                 if (mouseIsDown) {
                     toggleUrlCollection(link, event.target);
                     mouseIsDown = false;
@@ -608,7 +608,7 @@ function setupRightClickCollection() {
 
 function toggleUrlCollection(link, target) {
     if (!link.href) return;
-    
+
     if (collectedUrls.has(link.href)) {
         // Remove from collection
         const element = collectedUrls.get(link.href);
@@ -631,13 +631,13 @@ function toggleUrlCollection(link, target) {
         collectedUrls.set(link.href, target);
         console.log('Added URL to collection:', link.href);
     }
-    
+
     console.log('Current collection size:', collectedUrls.size);
 }
 
 // === SHADOW DOM AND SPECIAL FEATURES ===
 function handleShadowRoots() {
-    document.addEventListener('mouseover', function(event) {
+    document.addEventListener('mouseover', function (event) {
         if (event.target.shadowRoot && !attachedElements.has(event.target)) {
             attachDragHandler(event.target.shadowRoot);
         }
@@ -647,12 +647,11 @@ function handleShadowRoots() {
 function setupYouTubeFeatures() {
     const domain = document.domain;
     if (domain !== 'www.youtube.com' && domain !== 'm.youtube.com') return;
-    
-    const state = GM_getValue('hh_mobile', 'unset');
+
     const firstChar = (location.host || '').charAt(0);
-    
+
     function addYouTubeMenuCommand(label, url, persistent) {
-        GM_registerMenuCommand(label, function() {
+        GM_registerMenuCommand(label, function () {
             if (persistent) {
                 if (url.includes('m.youtube.com')) {
                     GM_setValue('hh_mobile', true);
@@ -662,7 +661,7 @@ function setupYouTubeFeatures() {
             } else {
                 GM_deleteValue('hh_mobile');
             }
-            
+
             try {
                 location.replace(url);
             } catch (error) {
@@ -670,7 +669,7 @@ function setupYouTubeFeatures() {
             }
         });
     }
-    
+
     if (firstChar === 'w') {
         addYouTubeMenuCommand(
             "Switch to YouTube Mobile (Persistent)",
@@ -693,7 +692,7 @@ function setupYouTubeFeatures() {
             "https://www.youtube.com/?persist_app=0&app=desktop",
             false
         );
-        
+
         // Mobile layout improvements
         try {
             GM_addStyle(`
@@ -717,7 +716,7 @@ function initialize() {
         setupRightClickCollection();
         handleShadowRoots();
         setupYouTubeFeatures();
-        
+
         console.log('Handlers Helper (Improved) initialized successfully');
     } catch (error) {
         console.error('Initialization failed:', error);
