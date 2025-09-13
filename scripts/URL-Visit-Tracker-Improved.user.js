@@ -23,7 +23,7 @@
     MAX_VISITS_STORED: 20,
     MAX_URLS_STORED: 10000,         // Massive capacity for extensive tracking
     CLEANUP_THRESHOLD: 12000,       // Cleanup when exceeding this (20% buffer)
-    HOVER_DELAY: 200,
+    HOVER_DELAY: 1000,              // Delay before showing tooltip (ms)
     POLL_INTERVAL: 5000,            // Reduced polling frequency for better performance
     BADGE_POSITION: { right: '14px', bottom: '14px' },
     BADGE_VISIBLE: true,
