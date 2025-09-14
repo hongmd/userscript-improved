@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.11
+// @version      1.2.12
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -339,4 +339,51 @@
     };
     
     console.log("💡 Manual test: Copy and run in console: testGDriveDownload('YOUR_URL_HERE')");
+    
+    // Add test button to page for easy testing
+    function addTestButton() {
+        if (!document.body) {
+            setTimeout(addTestButton, 100);
+            return;
+        }
+        
+        // Check if button already exists
+        if (document.getElementById('gdrive-test-btn')) return;
+        
+        const testBtn = document.createElement('button');
+        testBtn.id = 'gdrive-test-btn';
+        testBtn.innerHTML = '🗂️ Test GDrive Download';
+        testBtn.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        `;
+        
+        testBtn.onclick = function() {
+            const testUrl = prompt('Enter Google Drive URL to test:', 'https://drive.usercontent.google.com/download?id=1MExRoVwC9nwWn5LviZbJ8GgjEjp8syhz&export=download&authuser=0');
+            if (testUrl) {
+                console.log('🧪 Manual test triggered for:', testUrl);
+                openDownload(createDirectDownloadUrl(testUrl));
+            }
+        };
+        
+        document.body.appendChild(testBtn);
+        console.log('✅ Test button added to page');
+    }
+    
+    // Add button after page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', addTestButton);
+    } else {
+        addTestButton();
+    }
 })();
