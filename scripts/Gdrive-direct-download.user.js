@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.8
+// @version      1.2.9
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -108,12 +108,26 @@
     function openDownload(url) {
         console.log("Attempting to open download:", url);
         
-        // Method 1: Try window.open (may be blocked by popup blocker)
+        // Method 1: PRIORITIZE location.href redirect (most reliable for downloads)
+        try {
+            console.log("🔄 Using location.href redirect (most reliable for downloads)...");
+            // Small delay to show user what's happening
+            alert("🚀 Starting download... Page will redirect to download URL.");
+            setTimeout(() => {
+                window.location.href = url;
+            }, 100);
+            console.log("✅ Download initiated with location.href");
+            return true;
+        } catch (e) {
+            console.warn("⚠️ location.href failed:", e);
+        }
+        
+        // Method 2: Try window.open as fallback
         try {
             const newWindow = window.open(url, '_blank');
             if (newWindow) {
                 console.log("✅ Download opened successfully with window.open");
-                // Close the popup after a short delay to avoid leaving empty windows
+                // Close the popup after a short delay
                 setTimeout(() => {
                     try {
                         newWindow.close();
@@ -129,25 +143,12 @@
             console.warn("⚠️ window.open failed:", e);
         }
         
-        // Method 2: Try location.href (redirect current page) - MOST RELIABLE
-        try {
-            console.log("🔄 Trying location.href redirect (most reliable)...");
-            // Add a small delay to ensure user sees the message
-            setTimeout(() => {
-                window.location.href = url;
-            }, 500);
-            console.log("✅ Download initiated with location.href");
-            return true;
-        } catch (e) {
-            console.warn("⚠️ location.href failed:", e);
-        }
-        
         // Method 3: Create temporary link and click it
         try {
             console.log("🔗 Trying programmatic link click...");
             const link = document.createElement('a');
             link.href = url;
-            link.download = ''; // Let browser determine filename
+            link.download = '';
             link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
@@ -158,7 +159,7 @@
             console.warn("⚠️ Link click failed:", e);
         }
         
-        // Method 4: Copy to clipboard as fallback
+        // Method 4: Copy to clipboard as last resort
         try {
             console.log("📋 Copying URL to clipboard as fallback...");
             navigator.clipboard.writeText(url).then(() => {
@@ -167,7 +168,7 @@
             });
         } catch (e) {
             console.error("❌ All download methods failed!");
-            alert(`❌ Failed to open download automatically.\n\n📄 Please manually copy and open this URL in a new tab:\n\n${url}`);
+            alert(`❌ Failed to open download automatically.\n\n📄 Please manually copy and open this URL:\n\n${url}`);
         }
         
         return false;
