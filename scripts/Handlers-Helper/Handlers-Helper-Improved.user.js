@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Handlers Helper (Improved)
 // @namespace   Violentmonkey Scripts
-// @version     4.9.0
+// @version     4.9.1
 // @description Helper for protocol_hook.lua - Enhanced drag-to-action system for media links with MPV integration. Supports multiple protocols (mpv://, streamlink, yt-dlp) and customizable actions.
 // @author      hongmd (improved)
 // @license     MIT
@@ -20,22 +20,22 @@
 'use strict';
 
 /**
- * Handlers Helper (Improved) - Modular Version
+ * Handlers Helper (Improved) - Modular Version (Fixed Dependencies)
  *
  * This userscript provides enhanced drag-to-action functionality for media links
  * with MPV integration and multiple protocol support.
  *
  * Architecture:
- * - Constants: Configuration and default values
- * - State: Global state management
- * - Utils: Utility functions
- * - Menu: Menu command setup
- * - LiveChat: Live chat integration
- * - Actions: Action execution logic
- * - Drag: Drag handling and direction calculation
- * - Collection: URL collection system
- * - YouTube: YouTube-specific features
- * - Main: Initialization and orchestration
+ * - Constants: Configuration and default values (no deps)
+ * - Utils: Utility functions (no deps)
+ * - State: Global state management (depends on Utils)
+ * - LiveChat: Live chat integration (depends on Utils, Constants)
+ * - Actions: Action execution logic (depends on Utils, State, LiveChat)
+ * - Drag: Drag handling and direction calculation (depends on Utils, State, Constants, Actions)
+ * - Menu: Menu command setup (depends on Utils, State, Constants, Drag)
+ * - Collection: URL collection system (depends on Utils, State)
+ * - YouTube: YouTube-specific features (depends on Utils)
+ * - Main: Initialization and orchestration (depends on all)
  */
 
 // ===== MODULE: CONSTANTS =====
@@ -93,6 +93,88 @@ const Constants = (() => {
     };
 })();
 
+// ===== MODULE: UTILS =====
+const Utils = (() => {
+    'use strict';
+
+    const safePrompt = (message, defaultValue) => {
+        try {
+            const result = window.prompt(message, defaultValue);
+            return result === null ? null : result.trim();
+        } catch (error) {
+            debugError('Prompt error:', error);
+            return null;
+        }
+    };
+
+    const reloadPage = () => {
+        try {
+            window.location.reload();
+        } catch (error) {
+            debugError('Reload failed:', error);
+        }
+    };
+
+    const debugLog = (...args) => {
+        // Check if State is available and debug is enabled
+        if (typeof State !== 'undefined' && State.settings && State.settings.debug) {
+            console.log(...args);
+        }
+    };
+
+    const debugWarn = (...args) => {
+        if (typeof State !== 'undefined' && State.settings && State.settings.debug) {
+            console.warn(...args);
+        }
+    };
+
+    const debugError = (...args) => {
+        if (typeof State !== 'undefined' && State.settings && State.settings.debug) {
+            console.error(...args);
+        } else {
+            // Always log errors even if debug is off
+            console.error(...args);
+        }
+    };
+
+    const getParentByTagName = (element, tagName) => {
+        if (!element || typeof tagName !== 'string') return null;
+
+        tagName = tagName.toLowerCase();
+        let current = element;
+
+        while (current && current.nodeType === Node.ELEMENT_NODE) {
+            if (current.tagName && current.tagName.toLowerCase() === tagName) {
+                return current;
+            }
+            current = current.parentNode;
+        }
+        return null;
+    };
+
+    const encodeUrl = (url) => {
+        try {
+            new URL(url);
+            return btoa(url).replace(/[/+=]/g, match =>
+                match === '/' ? '_' : match === '+' ? '-' : ''
+            );
+        } catch (error) {
+            debugError('Invalid URL provided to encodeUrl:', url, error);
+            return '';
+        }
+    };
+
+    return {
+        safePrompt,
+        reloadPage,
+        debugLog,
+        debugWarn,
+        debugError,
+        getParentByTagName,
+        encodeUrl
+    };
+})();
+
 // ===== MODULE: STATE =====
 const State = (() => {
     'use strict';
@@ -134,14 +216,6 @@ const State = (() => {
         Utils.debugLog(`Updated ${key} to:`, value);
     };
 
-    const reloadPage = () => {
-        try {
-            window.location.reload();
-        } catch (error) {
-            Utils.debugError('Reload failed:', error);
-        }
-    };
-
     return {
         init,
         get settings() { return settings; },
@@ -149,219 +223,7 @@ const State = (() => {
         set hlsdomainArray(value) { hlsdomainArray = value; },
         get collectedUrls() { return collectedUrls; },
         get attachedElements() { return attachedElements; },
-        updateSetting,
-        reloadPage
-    };
-})();
-
-// ===== MODULE: UTILS =====
-const Utils = (() => {
-    'use strict';
-
-    const safePrompt = (message, defaultValue) => {
-        try {
-            const result = window.prompt(message, defaultValue);
-            return result === null ? null : result.trim();
-        } catch (error) {
-            debugError('Prompt error:', error);
-            return null;
-        }
-    };
-
-    const updateSetting = (key, value) => {
-        State.updateSetting(key, value);
-    };
-
-    const reloadPage = () => {
-        State.reloadPage();
-    };
-
-    const debugLog = (...args) => {
-        if (State.settings.debug) {
-            console.log(...args);
-        }
-    };
-
-    const debugWarn = (...args) => {
-        if (State.settings.debug) {
-            console.warn(...args);
-        }
-    };
-
-    const debugError = (...args) => {
-        if (State.settings.debug) {
-            console.error(...args);
-        }
-    };
-
-    const getParentByTagName = (element, tagName) => {
-        if (!element || typeof tagName !== 'string') return null;
-
-        tagName = tagName.toLowerCase();
-        let current = element;
-
-        while (current && current.nodeType === Node.ELEMENT_NODE) {
-            if (current.tagName && current.tagName.toLowerCase() === tagName) {
-                return current;
-            }
-            current = current.parentNode;
-        }
-        return null;
-    };
-
-    const encodeUrl = (url) => {
-        try {
-            new URL(url);
-            return btoa(url).replace(/[/+=]/g, match =>
-                match === '/' ? '_' : match === '+' ? '-' : ''
-            );
-        } catch (error) {
-            debugError('Invalid URL provided to encodeUrl:', url, error);
-            return '';
-        }
-    };
-
-    return {
-        safePrompt,
-        updateSetting,
-        reloadPage,
-        debugLog,
-        debugWarn,
-        debugError,
-        getParentByTagName,
-        encodeUrl
-    };
-})();
-
-// ===== MODULE: MENU =====
-const Menu = (() => {
-    'use strict';
-
-    const showActionHelp = () => {
-        const helpText = `🎮 DRAG DIRECTIONS & ACTIONS:
-
-📺 UP (↑): ${State.settings.UP}
-   → Pipes video to MPV with yt-dlp processing
-   → Good for: YouTube, complex streams
-
-📥 DOWN (↓): ${State.settings.DOWN} ${State.settings.down_confirm ? '(Confirm: ON)' : '(Confirm: OFF)'}
-   → Downloads video using yt-dlp
-   → Good for: Saving videos locally
-
-🌊 LEFT (←): ${State.settings.LEFT}
-   → Streams video using streamlink
-   → Good for: Twitch, live streams
-
-▶️ RIGHT (→): ${State.settings.RIGHT}
-   → Direct play in MPV player
-   → Good for: Direct video files
-
-📋 UP-LEFT (↖): list
-   → Adds to IPTV/playlist
-   → Good for: Building playlists
-
-🎯 USAGE:
-1. Hover over a video link
-2. Drag in desired direction
-3. Release to trigger action
-
-🔧 Settings: ${State.settings.total_direction} directions, HLS: ${State.settings.hlsdomain.split(',').length} domains
-
-🐛 TROUBLESHOOTING:
-- Check browser console (F12) for debug logs
-- Make sure links are draggable (script auto-enables)
-- Try dragging further than ${Constants.DRAG_THRESHOLD}px
-- Look for "🚀 Drag started" and "⬆️ Executing UP action" logs`;
-
-        alert(helpText);
-    };
-
-    const testDirections = () => {
-        Utils.debugLog('🧪 Testing direction detection:');
-        const tests = [
-            { name: 'UP', start: [100, 100], end: [100, 50] },
-            { name: 'DOWN', start: [100, 100], end: [100, 150] },
-            { name: 'LEFT', start: [100, 100], end: [50, 100] },
-            { name: 'RIGHT', start: [100, 100], end: [150, 100] },
-            { name: 'UP-LEFT', start: [100, 100], end: [50, 50] },
-            { name: 'NO MOVEMENT', start: [100, 100], end: [105, 105] }
-        ];
-
-        tests.forEach(test => {
-            const direction = Drag.getDirection(test.start[0], test.start[1], test.end[0], test.end[1]);
-            Utils.debugLog(`${test.name}: (${test.start[0]},${test.start[1]}) -> (${test.end[0]},${test.end[1]}) = Direction ${direction}`);
-        });
-    };
-
-    const setupMenuCommands = () => {
-        // Help command first
-        GM_registerMenuCommand('❓ Show Action Help', showActionHelp);
-        GM_registerMenuCommand('🧪 Test Directions', testDirections);
-
-        GM_registerMenuCommand(`📺 UP: ${State.settings.UP}`, function () {
-            const value = Utils.safePrompt(Constants.GUIDE + '\n\n↑ UP Action (pipe = stream to MPV with yt-dlp)', State.settings.UP);
-            if (value) {
-                Utils.updateSetting('UP', value);
-                Utils.reloadPage();
-            }
-        });
-
-        GM_registerMenuCommand(`📥 DOWN: ${State.settings.DOWN}`, function () {
-            const value = Utils.safePrompt(Constants.GUIDE + '\n\n↓ DOWN Action (ytdl = download with yt-dlp)', State.settings.DOWN);
-            if (value) {
-                Utils.updateSetting('DOWN', value);
-                Utils.reloadPage();
-            }
-        });
-
-        GM_registerMenuCommand(`🌊 LEFT: ${State.settings.LEFT}`, function () {
-            const value = Utils.safePrompt(Constants.GUIDE + '\n\n← LEFT Action (stream = use streamlink)', State.settings.LEFT);
-            if (value) {
-                Utils.updateSetting('LEFT', value);
-                Utils.reloadPage();
-            }
-        });
-
-        GM_registerMenuCommand(`▶️ RIGHT: ${State.settings.RIGHT}`, function () {
-            const value = Utils.safePrompt(Constants.GUIDE + '\n\n→ RIGHT Action (mpv = direct play)', State.settings.RIGHT);
-            if (value) {
-                Utils.updateSetting('RIGHT', value);
-                Utils.reloadPage();
-            }
-        });
-
-        GM_registerMenuCommand('HLS Domains', function () {
-            const value = Utils.safePrompt('Example: 1.com,2.com,3.com,4.com', State.settings.hlsdomain);
-            if (value !== null) {
-                Utils.updateSetting('hlsdomain', value);
-                State.hlsdomainArray = value.split(',').filter(d => d.trim());
-            }
-        });
-
-        GM_registerMenuCommand(`Live Chat: ${State.settings.livechat}`, function () {
-            Utils.updateSetting('livechat', !State.settings.livechat);
-            Utils.reloadPage();
-        });
-
-        GM_registerMenuCommand(`Directions: ${State.settings.total_direction}`, function () {
-            const newValue = State.settings.total_direction === 4 ? 8 : 4;
-            Utils.updateSetting('total_direction', newValue);
-            Utils.reloadPage();
-        });
-
-        GM_registerMenuCommand(`DOWN Confirm: ${State.settings.down_confirm ? 'ON' : 'OFF'}`, function () {
-            Utils.updateSetting('down_confirm', !State.settings.down_confirm);
-            Utils.reloadPage();
-        });
-
-        GM_registerMenuCommand(`🐛 Debug Mode: ${State.settings.debug ? 'ON' : 'OFF'}`, function () {
-            Utils.updateSetting('debug', !State.settings.debug);
-            Utils.reloadPage();
-        });
-    };
-
-    return {
-        setupMenuCommands
+        updateSetting
     };
 })();
 
@@ -749,6 +611,138 @@ const Drag = (() => {
     return {
         getDirection,
         attachDragHandler
+    };
+})();
+
+// ===== MODULE: MENU =====
+const Menu = (() => {
+    'use strict';
+
+    const showActionHelp = () => {
+        const helpText = `🎮 DRAG DIRECTIONS & ACTIONS:
+
+📺 UP (↑): ${State.settings.UP}
+   → Pipes video to MPV with yt-dlp processing
+   → Good for: YouTube, complex streams
+
+📥 DOWN (↓): ${State.settings.DOWN} ${State.settings.down_confirm ? '(Confirm: ON)' : '(Confirm: OFF)'}
+   → Downloads video using yt-dlp
+   → Good for: Saving videos locally
+
+🌊 LEFT (←): ${State.settings.LEFT}
+   → Streams video using streamlink
+   → Good for: Twitch, live streams
+
+▶️ RIGHT (→): ${State.settings.RIGHT}
+   → Direct play in MPV player
+   → Good for: Direct video files
+
+📋 UP-LEFT (↖): list
+   → Adds to IPTV/playlist
+   → Good for: Building playlists
+
+🎯 USAGE:
+1. Hover over a video link
+2. Drag in desired direction
+3. Release to trigger action
+
+🔧 Settings: ${State.settings.total_direction} directions, HLS: ${State.settings.hlsdomain.split(',').length} domains
+
+🐛 TROUBLESHOOTING:
+- Check browser console (F12) for debug logs
+- Make sure links are draggable (script auto-enables)
+- Try dragging further than ${Constants.DRAG_THRESHOLD}px
+- Look for "🚀 Drag started" and "⬆️ Executing UP action" logs`;
+
+        alert(helpText);
+    };
+
+    const testDirections = () => {
+        Utils.debugLog('🧪 Testing direction detection:');
+        const tests = [
+            { name: 'UP', start: [100, 100], end: [100, 50] },
+            { name: 'DOWN', start: [100, 100], end: [100, 150] },
+            { name: 'LEFT', start: [100, 100], end: [50, 100] },
+            { name: 'RIGHT', start: [100, 100], end: [150, 100] },
+            { name: 'UP-LEFT', start: [100, 100], end: [50, 50] },
+            { name: 'NO MOVEMENT', start: [100, 100], end: [105, 105] }
+        ];
+
+        tests.forEach(test => {
+            const direction = Drag.getDirection(test.start[0], test.start[1], test.end[0], test.end[1]);
+            Utils.debugLog(`${test.name}: (${test.start[0]},${test.start[1]}) -> (${test.end[0]},${test.end[1]}) = Direction ${direction}`);
+        });
+    };
+
+    const setupMenuCommands = () => {
+        // Help command first
+        GM_registerMenuCommand('❓ Show Action Help', showActionHelp);
+        GM_registerMenuCommand('🧪 Test Directions', testDirections);
+
+        GM_registerMenuCommand(`📺 UP: ${State.settings.UP}`, function () {
+            const value = Utils.safePrompt(Constants.GUIDE + '\n\n↑ UP Action (pipe = stream to MPV with yt-dlp)', State.settings.UP);
+            if (value) {
+                State.updateSetting('UP', value);
+                Utils.reloadPage();
+            }
+        });
+
+        GM_registerMenuCommand(`📥 DOWN: ${State.settings.DOWN}`, function () {
+            const value = Utils.safePrompt(Constants.GUIDE + '\n\n↓ DOWN Action (ytdl = download with yt-dlp)', State.settings.DOWN);
+            if (value) {
+                State.updateSetting('DOWN', value);
+                Utils.reloadPage();
+            }
+        });
+
+        GM_registerMenuCommand(`🌊 LEFT: ${State.settings.LEFT}`, function () {
+            const value = Utils.safePrompt(Constants.GUIDE + '\n\n← LEFT Action (stream = use streamlink)', State.settings.LEFT);
+            if (value) {
+                State.updateSetting('LEFT', value);
+                Utils.reloadPage();
+            }
+        });
+
+        GM_registerMenuCommand(`▶️ RIGHT: ${State.settings.RIGHT}`, function () {
+            const value = Utils.safePrompt(Constants.GUIDE + '\n\n→ RIGHT Action (mpv = direct play)', State.settings.RIGHT);
+            if (value) {
+                State.updateSetting('RIGHT', value);
+                Utils.reloadPage();
+            }
+        });
+
+        GM_registerMenuCommand('HLS Domains', function () {
+            const value = Utils.safePrompt('Example: 1.com,2.com,3.com,4.com', State.settings.hlsdomain);
+            if (value !== null) {
+                State.updateSetting('hlsdomain', value);
+                State.hlsdomainArray = value.split(',').filter(d => d.trim());
+            }
+        });
+
+        GM_registerMenuCommand(`Live Chat: ${State.settings.livechat}`, function () {
+            State.updateSetting('livechat', !State.settings.livechat);
+            Utils.reloadPage();
+        });
+
+        GM_registerMenuCommand(`Directions: ${State.settings.total_direction}`, function () {
+            const newValue = State.settings.total_direction === 4 ? 8 : 4;
+            State.updateSetting('total_direction', newValue);
+            Utils.reloadPage();
+        });
+
+        GM_registerMenuCommand(`DOWN Confirm: ${State.settings.down_confirm ? 'ON' : 'OFF'}`, function () {
+            State.updateSetting('down_confirm', !State.settings.down_confirm);
+            Utils.reloadPage();
+        });
+
+        GM_registerMenuCommand(`🐛 Debug Mode: ${State.settings.debug ? 'ON' : 'OFF'}`, function () {
+            State.updateSetting('debug', !State.settings.debug);
+            Utils.reloadPage();
+        });
+    };
+
+    return {
+        setupMenuCommands
     };
 })();
 
