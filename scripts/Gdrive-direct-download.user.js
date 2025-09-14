@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.7
+// @version      1.2.8
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -113,6 +113,14 @@
             const newWindow = window.open(url, '_blank');
             if (newWindow) {
                 console.log("✅ Download opened successfully with window.open");
+                // Close the popup after a short delay to avoid leaving empty windows
+                setTimeout(() => {
+                    try {
+                        newWindow.close();
+                    } catch (e) {
+                        // Ignore errors when closing
+                    }
+                }, 1000);
                 return true;
             } else {
                 console.warn("⚠️ window.open was blocked by popup blocker");
@@ -121,10 +129,13 @@
             console.warn("⚠️ window.open failed:", e);
         }
         
-        // Method 2: Try location.href (redirect current page)
+        // Method 2: Try location.href (redirect current page) - MOST RELIABLE
         try {
-            console.log("🔄 Trying location.href redirect...");
-            window.location.href = url;
+            console.log("🔄 Trying location.href redirect (most reliable)...");
+            // Add a small delay to ensure user sees the message
+            setTimeout(() => {
+                window.location.href = url;
+            }, 500);
             console.log("✅ Download initiated with location.href");
             return true;
         } catch (e) {
@@ -151,12 +162,12 @@
         try {
             console.log("📋 Copying URL to clipboard as fallback...");
             navigator.clipboard.writeText(url).then(() => {
-                alert(`Download URL copied to clipboard:\n\n${url}\n\nPaste this URL into a new tab to download.`);
+                alert(`🚀 Download URL copied to clipboard!\n\n📄 ${url}\n\n🔗 Paste this URL into a new tab to download directly.`);
                 console.log("✅ URL copied to clipboard");
             });
         } catch (e) {
             console.error("❌ All download methods failed!");
-            alert(`Failed to open download automatically.\n\nPlease manually open this URL in a new tab:\n\n${url}`);
+            alert(`❌ Failed to open download automatically.\n\n📄 Please manually copy and open this URL in a new tab:\n\n${url}`);
         }
         
         return false;

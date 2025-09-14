@@ -38,11 +38,11 @@
         <p>Look for messages:</p>
         <ul>
             <li><code>🚀 Intercepting [XHR/fetch/click] request</code> - Script detected download</li>
-            <li><code>✅ Download opened successfully</code> - Success with popup</li>
-            <li><code>🔄 Trying location.href redirect</code> - Fallback method</li>
-            <li><code>📋 Copying URL to clipboard</code> - Last resort fallback</li>
+            <li><code>🔄 Trying location.href redirect (most reliable)</code> - <strong>NEW: This will redirect current page to download</strong></li>
+            <li><code>✅ Download initiated with location.href</code> - Success!</li>
+            <li><code>📋 Copying URL to clipboard</code> - Fallback if redirect fails</li>
         </ul>
-        <p><strong>If popup blocker blocks downloads:</strong> Allow popups for Google Drive or use the clipboard fallback.</p>
+        <p><strong>⚠️ Note:</strong> The script now redirects the current page to start download automatically. This is the most reliable method!</p>
     </div>
 
     <script>
