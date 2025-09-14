@@ -1,17 +1,25 @@
 // ==UserScript==
 // @name        Reject ServiceWorker Auto (Simple)
+// @name:vi     Từ Chối ServiceWorker Tự Động (Đơn Giản)
 // @namespace   rejectserviceWorkerAuto
+// @version     1.7.2
+// @description Blocks ServiceWorker on all websites. Simple whitelist management with clear menu options. Prevents PWA installations and background sync.
+// @description:vi Chặn ServiceWorker trên tất cả websites. Quản lý whitelist đơn giản với các tùy chọn menu rõ ràng. Ngăn chặn cài đặt PWA và đồng bộ nền.
+// @author      hongmd
+// @license     MIT
+// @homepageURL https://github.com/hongmd/userscript-improved
+// @supportURL  https://github.com/hongmd/userscript-improved/issues
 // @match       *://*/*
 // @run-at      document-start
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_registerMenuCommand
-// @version     1.7.1
-// @author      hongmd
-// @description Blocks ServiceWorker on all websites. Simple whitelist management with clear menu options.
 // @compatible  ScriptCat
 // @compatible  Tampermonkey
 // @compatible  Greasemonkey
+// @noframes
+// @updateURL   https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/Reject-ServiceWorker-Auto.user.js
+// @downloadURL https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/Reject-ServiceWorker-Auto.user.js
 // ==/UserScript==
 
 'use strict';

@@ -1,14 +1,21 @@
 // ==UserScript==
 // @name         Google Drive Direct Download - Bypass Virus Scan
+// @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.1
-// @description  Bypass Google Drive virus scan warning and download files directly
+// @version      1.2
+// @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
+// @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
+// @license      MIT
+// @homepageURL  https://github.com/hongmd/userscript-improved
+// @supportURL   https://github.com/hongmd/userscript-improved/issues
 // @match        https://drive.google.com/*
 // @match        https://drive.usercontent.google.com/*
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/hongmd/userscript-improved/master/Gdrive-direct-download.js
-// @downloadURL  https://raw.githubusercontent.com/hongmd/userscript-improved/master/Gdrive-direct-download.js
+// @run-at       document-start
+// @noframes
+// @updateURL    https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/Gdrive-direct-download.user.js
+// @downloadURL  https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/Gdrive-direct-download.user.js
 // ==/UserScript==
 
 (function () {

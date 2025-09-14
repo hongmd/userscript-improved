@@ -1,18 +1,23 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
+// @name:vi      Theo Dõi Lượt Truy Cập URL (Cải Tiến)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version        2.5.2
-// @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips
+// @version      2.5.3
+// @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips. Advanced URL normalization and performance optimizations.
+// @description:vi Theo dõi lượt truy cập cho mỗi URL, hiển thị lịch sử badge góc và thông tin hover liên kết - Dung lượng khổng lồ (10K URLs) - ES2020+ và Tooltips mượt mà. Chuẩn hóa URL nâng cao và tối ưu hóa hiệu suất.
 // @author       hongmd
 // @contributor  Original idea by Chewy
-// @homepage     https://greasyfork.org/en/scripts/548595-url-visit-tracker-improved
+// @license      MIT
 // @homepageURL  https://github.com/hongmd/userscript-improved
 // @supportURL   https://github.com/hongmd/userscript-improved/issues
-// @license      MIT
 // @match        https://*/*
+// @run-at       document-start
+// @noframes
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @updateURL    https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/URL-Visit-Tracker-Improved.user.js
+// @downloadURL  https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/URL-Visit-Tracker-Improved.user.js
 // ==/UserScript==
 
 (function () {

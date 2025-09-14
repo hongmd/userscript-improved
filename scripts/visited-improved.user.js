@@ -1,8 +1,14 @@
 // ==UserScript==
 // @name         Visited Links Enhanced - Flat UI
+// @name:vi      Liên Kết Đã Truy Cập Nâng Cao - Giao Diện Phẳng
 // @namespace    com.userscript.visited-links-enhanced
-// @description  Minimalist flat UI userscript for visited links customization
-// @version      0.6.3
+// @version      0.6.4
+// @description  Minimalist flat UI userscript for visited links customization. Customize visited link colors with a clean, modern interface and site-specific exceptions.
+// @description:vi Userscript giao diện phẳng tối giản để tùy chỉnh liên kết đã truy cập. Tùy chỉnh màu liên kết đã truy cập với giao diện sạch sẽ, hiện đại và ngoại lệ theo site.
+// @author       Enhanced by AI Assistant ft. Hongmd
+// @license      MIT
+// @homepageURL  https://github.com/hongmd/userscript-improved
+// @supportURL   https://github.com/hongmd/userscript-improved/issues
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -15,6 +21,8 @@
 // @compatible   ScriptCat
 // @compatible   Tampermonkey
 // @compatible   Greasemonkey
+// @updateURL    https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/visited-improved.user.js
+// @downloadURL  https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/visited-improved.user.js
 // @copyright    2025, Enhanced by AI Assistant ft. Hongmd
 // ==/UserScript==
 
