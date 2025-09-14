@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.10
+// @version      1.2.11
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -262,6 +262,57 @@
     }, true); // Use capture phase to intercept before other handlers
 
     console.log("Google Drive Direct Download script loaded - Virus scan bypass enabled");
+    
+    // ===== VIRUS SCAN PAGE DETECTION =====
+    // If user lands on virus scan page, automatically redirect to direct download
+    function checkForVirusScanPage() {
+        const currentUrl = window.location.href;
+        
+        // Check if we're on a Google Drive page with virus scan
+        if (currentUrl.includes('drive.google.com') && 
+            (document.title.includes('Virus scan') || 
+             document.body?.textContent?.includes('virus scan') ||
+             document.querySelector('[data-target="virus-scan"]') ||
+             document.querySelector('.virus-scan-warning'))) {
+            
+            console.log("🔍 Detected virus scan page, attempting to bypass...");
+            
+            // Try to extract file ID from current URL
+            const urlMatch = currentUrl.match(/\/file\/d\/([^\/]+)/) || currentUrl.match(/id=([^&]+)/);
+            if (urlMatch) {
+                const fileId = urlMatch[1];
+                const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+                
+                console.log("🚀 Redirecting from virus scan page to direct download:", directUrl);
+                alert("🚀 Bypassing Google Drive virus scan... Redirecting to direct download.");
+                
+                setTimeout(() => {
+                    window.location.href = directUrl;
+                }, 500);
+                
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // Check immediately and also after page loads
+    if (!checkForVirusScanPage()) {
+        // If not on virus scan page, set up monitoring for dynamic content
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    // Check if virus scan content was added
+                    setTimeout(checkForVirusScanPage, 100);
+                }
+            });
+        });
+        
+        if (document.body) {
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+    }
     
     // Test the specific URL provided by user
     const testUrl = "https://drive.usercontent.google.com/download?id=1MExRoVwC9nwWn5LviZbJ8GgjEjp8syhz&export=download&authuser=0";
