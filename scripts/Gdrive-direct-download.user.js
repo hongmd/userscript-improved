@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.4
+// @version      1.2.5
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -93,6 +93,7 @@
     window.fetch = async function (resource, init) {
         try {
             if (typeof resource === "string" && isGoogleDriveUrl(resource)) {
+                console.log("🚀 Intercepting fetch request:", resource);
                 const directUrl = createDirectDownloadUrl(resource);
                 if (directUrl) {
                     console.log("Bypassing virus scan, opening direct download:", directUrl);
@@ -119,6 +120,7 @@
     XMLHttpRequest.prototype.send = function (data) {
         try {
             if (this._url && typeof this._url === "string" && isGoogleDriveUrl(this._url)) {
+                console.log("🚀 Intercepting XHR request:", this._url);
                 const directUrl = createDirectDownloadUrl(this._url);
                 if (directUrl) {
                     console.log("Bypassing virus scan via XHR, opening direct download:", directUrl);
@@ -149,6 +151,7 @@
         try {
             const target = event.target.closest('a');
             if (target && target.href && isGoogleDriveUrl(target.href)) {
+                console.log("🚀 Intercepting click on link:", target.href);
                 const directUrl = createDirectDownloadUrl(target.href);
                 if (directUrl) {
                     event.preventDefault();
@@ -162,4 +165,30 @@
     }, true);
 
     console.log("Google Drive Direct Download script loaded - Virus scan bypass enabled");
+    
+    // Test the specific URL provided by user
+    const testUrl = "https://drive.usercontent.google.com/download?id=1MExRoVwC9nwWn5LviZbJ8GgjEjp8syhz&export=download&authuser=0";
+    console.log("Testing URL:", testUrl);
+    console.log("Is Google Drive URL:", isGoogleDriveUrl(testUrl));
+    
+    if (isGoogleDriveUrl(testUrl)) {
+        const directUrl = createDirectDownloadUrl(testUrl);
+        console.log("Direct download URL:", directUrl);
+    }
+    
+    // Add global function for manual testing
+    window.testGDriveDownload = function(url) {
+        console.log("Manual test for URL:", url);
+        if (isGoogleDriveUrl(url)) {
+            const directUrl = createDirectDownloadUrl(url);
+            console.log("Opening direct download:", directUrl);
+            window.open(directUrl, "_blank");
+            return directUrl;
+        } else {
+            console.log("Not a Google Drive URL");
+            return null;
+        }
+    };
+    
+    console.log("💡 Manual test: Copy and run in console: testGDriveDownload('YOUR_URL_HERE')");
 })();

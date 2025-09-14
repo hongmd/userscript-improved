@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive Direct Download Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .url-input { width: 100%; padding: 8px; margin: 10px 0; font-family: monospace; }
+        button { background: #4285f4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #3367d6; }
+        .result { margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>🗂️ Google Drive Direct Download Test</h1>
+    <p>Test the userscript by entering a Google Drive URL below.</p>
+
+    <div class="test-section">
+        <h3>Manual URL Test</h3>
+        <input type="text" id="testUrl" class="url-input" placeholder="Paste Google Drive URL here..." value="https://drive.usercontent.google.com/download?id=1MExRoVwC9nwWn5LviZbJ8GgjEjp8syhz&export=download&authuser=0">
+        <br>
+        <button onclick="testUrl()">Test URL</button>
+        <button onclick="openDirectDownload()">Open Direct Download</button>
+        <div id="result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Console Commands</h3>
+        <p>Open browser console (F12) and run:</p>
+        <code>testGDriveDownload('YOUR_URL_HERE')</code>
+    </div>
+
+    <div class="test-section">
+        <h3>Debug Info</h3>
+        <p>Check browser console for detailed logs when script runs.</p>
+        <p>Look for messages starting with 🚀 to see if interception works.</p>
+    </div>
+
+    <script>
+        function testUrl() {
+            const url = document.getElementById('testUrl').value;
+            const result = document.getElementById('result');
+
+            if (typeof testGDriveDownload === 'function') {
+                const directUrl = testGDriveDownload(url);
+                result.innerHTML = directUrl ?
+                    `✅ Direct URL: <a href="${directUrl}" target="_blank">${directUrl}</a>` :
+                    '❌ Not a valid Google Drive URL';
+            } else {
+                result.innerHTML = '❌ Script not loaded. Make sure the userscript is enabled.';
+            }
+        }
+
+        function openDirectDownload() {
+            const url = document.getElementById('testUrl').value;
+            if (typeof testGDriveDownload === 'function') {
+                testGDriveDownload(url);
+            } else {
+                alert('Script not loaded!');
+            }
+        }
+
+        // Auto-test on page load
+        window.addEventListener('load', function() {
+            setTimeout(testUrl, 1000);
+        });
+    </script>
+</body>
+</html>
