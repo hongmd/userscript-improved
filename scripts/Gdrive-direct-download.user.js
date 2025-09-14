@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.5
+// @version      1.2.6
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -88,6 +88,64 @@
         return null;
     }
 
+    // Helper function to open download with multiple fallback methods
+    function openDownload(url) {
+        console.log("Attempting to open download:", url);
+        
+        // Method 1: Try window.open (may be blocked by popup blocker)
+        try {
+            const newWindow = window.open(url, '_blank');
+            if (newWindow) {
+                console.log("✅ Download opened successfully with window.open");
+                return true;
+            } else {
+                console.warn("⚠️ window.open was blocked by popup blocker");
+            }
+        } catch (e) {
+            console.warn("⚠️ window.open failed:", e);
+        }
+        
+        // Method 2: Try location.href (redirect current page)
+        try {
+            console.log("🔄 Trying location.href redirect...");
+            window.location.href = url;
+            console.log("✅ Download initiated with location.href");
+            return true;
+        } catch (e) {
+            console.warn("⚠️ location.href failed:", e);
+        }
+        
+        // Method 3: Create temporary link and click it
+        try {
+            console.log("🔗 Trying programmatic link click...");
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = ''; // Let browser determine filename
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            console.log("✅ Download initiated with link click");
+            return true;
+        } catch (e) {
+            console.warn("⚠️ Link click failed:", e);
+        }
+        
+        // Method 4: Copy to clipboard as fallback
+        try {
+            console.log("📋 Copying URL to clipboard as fallback...");
+            navigator.clipboard.writeText(url).then(() => {
+                alert(`Download URL copied to clipboard:\n\n${url}\n\nPaste this URL into a new tab to download.`);
+                console.log("✅ URL copied to clipboard");
+            });
+        } catch (e) {
+            console.error("❌ All download methods failed!");
+            alert(`Failed to open download automatically.\n\nPlease manually open this URL in a new tab:\n\n${url}`);
+        }
+        
+        return false;
+    }
+
     // Intercept fetch requests
     const originalFetch = window.fetch;
     window.fetch = async function (resource, init) {
@@ -97,7 +155,7 @@
                 const directUrl = createDirectDownloadUrl(resource);
                 if (directUrl) {
                     console.log("Bypassing virus scan, opening direct download:", directUrl);
-                    window.open(directUrl, "_blank");
+                    openDownload(directUrl);
                     return new Response(null, { status: 204 });
                 }
             }
@@ -124,8 +182,10 @@
                 const directUrl = createDirectDownloadUrl(this._url);
                 if (directUrl) {
                     console.log("Bypassing virus scan via XHR, opening direct download:", directUrl);
-                    window.open(directUrl, "_blank");
-
+                    
+                    // Try multiple methods to open download
+                    openDownload(directUrl);
+                    
                     // Prevent the original request and simulate a successful response
                     setTimeout(() => {
                         Object.defineProperty(this, 'readyState', { value: 4 });
@@ -156,7 +216,7 @@
                 if (directUrl) {
                     event.preventDefault();
                     console.log("Bypassing virus scan via link click, opening direct download:", directUrl);
-                    window.open(directUrl, "_blank");
+                    openDownload(directUrl);
                 }
             }
         } catch (e) {
@@ -182,7 +242,7 @@
         if (isGoogleDriveUrl(url)) {
             const directUrl = createDirectDownloadUrl(url);
             console.log("Opening direct download:", directUrl);
-            window.open(directUrl, "_blank");
+            openDownload(directUrl);
             return directUrl;
         } else {
             console.log("Not a Google Drive URL");

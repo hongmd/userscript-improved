@@ -35,7 +35,14 @@
     <div class="test-section">
         <h3>Debug Info</h3>
         <p>Check browser console for detailed logs when script runs.</p>
-        <p>Look for messages starting with 🚀 to see if interception works.</p>
+        <p>Look for messages:</p>
+        <ul>
+            <li><code>🚀 Intercepting [XHR/fetch/click] request</code> - Script detected download</li>
+            <li><code>✅ Download opened successfully</code> - Success with popup</li>
+            <li><code>🔄 Trying location.href redirect</code> - Fallback method</li>
+            <li><code>📋 Copying URL to clipboard</code> - Last resort fallback</li>
+        </ul>
+        <p><strong>If popup blocker blocks downloads:</strong> Allow popups for Google Drive or use the clipboard fallback.</p>
     </div>
 
     <script>
