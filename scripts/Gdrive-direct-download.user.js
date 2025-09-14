@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.14
+// @version      1.2.16
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -321,6 +321,12 @@
     // ===== DIRECT DOWNLOAD PAGE DETECTION =====
     // If user lands directly on a download URL, trigger download immediately
     function checkDirectDownloadPage() {
+        // Prevent infinite loops
+        if (window.gdriveDownloadTriggered) {
+            console.log("⏹️ Download already triggered, skipping");
+            return false;
+        }
+        
         const currentUrl = window.location.href;
         
         // Check if we're directly on a Google Drive download URL
@@ -333,26 +339,40 @@
             if (currentUrl.includes('confirm=t')) {
                 console.log("✅ URL already has confirm=t, forcing download programmatically");
                 
+                // Mark as triggered to prevent loops
+                window.gdriveDownloadTriggered = true;
+                
                 // Force download programmatically since browser may not auto-download
                 setTimeout(() => {
+                    console.log("🔗 Attempting programmatic download...");
+                    
+                    // Method 1: Create and click link
                     const link = document.createElement('a');
                     link.href = currentUrl;
-                    link.download = ''; // Let browser determine filename
+                    link.download = '';
+                    link.target = '_blank';
                     link.style.display = 'none';
                     
-                    // Try to trigger download
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
+                    console.log("✅ Link click attempted");
                     
-                    console.log("🔗 Forced download triggered");
-                    
-                    // If programmatic download doesn't work, show instructions
+                    // Method 2: Fallback - use window.open
                     setTimeout(() => {
-                        if (!document.querySelector('a[download]')) {
-                            alert(`🚀 Download should start automatically.\n\nIf not, right-click this page and "Save as..."\n\nURL: ${currentUrl}`);
+                        if (!document.querySelector('iframe[src*="drive.google.com"]')) {
+                            console.log("🔄 Fallback: using window.open");
+                            window.open(currentUrl, '_blank');
                         }
-                    }, 2000);
+                    }, 1000);
+                    
+                    // Method 3: Show instructions if download doesn't start
+                    setTimeout(() => {
+                        if (!document.querySelector('iframe[src*="drive.google.com"]')) {
+                            alert(`🚀 Download should start automatically.\n\nIf not, right-click this page and select "Save as..."\n\nFile URL: ${currentUrl}`);
+                            console.log("💡 Download instructions shown to user");
+                        }
+                    }, 3000);
                 }, 500);
                 
                 return true;
@@ -360,6 +380,9 @@
                 // Add confirm=t and redirect
                 const directUrl = createDirectDownloadUrl(currentUrl);
                 console.log("🔄 Adding confirm=t and redirecting to:", directUrl);
+                
+                // Mark as triggered
+                window.gdriveDownloadTriggered = true;
                 
                 setTimeout(() => {
                     window.location.href = directUrl;
@@ -401,44 +424,43 @@
     
     console.log("💡 Manual test: Copy and run in console: testGDriveDownload('YOUR_URL_HERE')");
     
-    // Add test button to page for easy testing
+    // ===== TEST FUNCTIONS =====
+    // Add test button for debugging
     function addTestButton() {
-        if (!document.body) {
-            setTimeout(addTestButton, 100);
-            return;
-        }
-        
-        // Check if button already exists
-        if (document.getElementById('gdrive-test-btn')) return;
-        
         const testBtn = document.createElement('button');
-        testBtn.id = 'gdrive-test-btn';
-        testBtn.innerHTML = '🗂️ Test GDrive Download';
+        testBtn.textContent = '🧪 Test GDrive Download';
         testBtn.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
             background: #4285f4;
             color: white;
             border: none;
-            padding: 10px 15px;
-            border-radius: 5px;
+            padding: 8px 12px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            font-size: 12px;
         `;
         
         testBtn.onclick = function() {
-            const testUrl = prompt('Enter Google Drive URL to test:', 'https://drive.usercontent.google.com/download?id=1MExRoVwC9nwWn5LviZbJ8GgjEjp8syhz&export=download&authuser=0');
-            if (testUrl) {
-                console.log('🧪 Manual test triggered for:', testUrl);
-                openDownload(createDirectDownloadUrl(testUrl));
-            }
+            const testUrls = [
+                'https://drive.google.com/file/d/1ABC123/view?usp=sharing',
+                'https://drive.google.com/open?id=1ABC123',
+                'https://drive.google.com/uc?id=1ABC123&export=download',
+                'https://drive.usercontent.google.com/download?id=1ABC123&confirm=t'
+            ];
+            
+            console.log('🧪 Testing URL processing:');
+            testUrls.forEach(url => {
+                const processed = createDirectDownloadUrl(url);
+                console.log(`  ${url} → ${processed}`);
+            });
+            
+            alert('Check console for test results!');
         };
         
         document.body.appendChild(testBtn);
-        console.log('✅ Test button added to page');
     }
     
     // Add button after page loads
@@ -447,4 +469,28 @@
     } else {
         addTestButton();
     }
+    
+    // ===== MAIN EXECUTION =====
+    (function() {
+        'use strict';
+        
+        console.log('🚀 Google Drive Direct Download script loaded');
+        
+        // Add test button for debugging
+        addTestButton();
+        
+        // Check if we're on a direct download page
+        if (checkDirectDownloadPage()) {
+            console.log('✅ Direct download page detected and handled');
+            return; // Don't set up other listeners
+        }
+        
+        // Set up click interception for regular Google Drive pages
+        setupClickInterception();
+        
+        // Set up XHR/fetch interception as fallback
+        setupNetworkInterception();
+        
+        console.log('🎯 Script ready - waiting for Google Drive links');
+    })();
 })();
