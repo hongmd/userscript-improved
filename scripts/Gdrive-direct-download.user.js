@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.9
+// @version      1.2.10
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -234,23 +234,32 @@
         return originalXHRSend.apply(this, arguments);
     };
 
-    // Additional: Handle direct clicks on download links
+    // Additional: Handle direct clicks on download links - PRIORITIZE THIS
     document.addEventListener('click', function (event) {
         try {
             const target = event.target.closest('a');
             if (target && target.href && isGoogleDriveUrl(target.href)) {
                 console.log("🚀 Intercepting click on link:", target.href);
+                event.preventDefault(); // Stop the default click behavior
+                event.stopPropagation();
+                
                 const directUrl = createDirectDownloadUrl(target.href);
                 if (directUrl) {
-                    event.preventDefault();
-                    console.log("Bypassing virus scan via link click, opening direct download:", directUrl);
-                    openDownload(directUrl);
+                    console.log("Bypassing virus scan via link click, redirecting to:", directUrl);
+                    
+                    // Show alert and redirect immediately
+                    alert("🚀 Starting Google Drive download... Page will redirect.");
+                    setTimeout(() => {
+                        window.location.href = directUrl;
+                    }, 100);
+                    
+                    return false; // Prevent any further processing
                 }
             }
         } catch (e) {
             console.error("Error handling link click:", e);
         }
-    }, true);
+    }, true); // Use capture phase to intercept before other handlers
 
     console.log("Google Drive Direct Download script loaded - Virus scan bypass enabled");
     
