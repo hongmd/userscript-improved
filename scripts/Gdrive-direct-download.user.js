@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.2
+// @version      1.2.3
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -18,18 +18,74 @@
 // @downloadURL  https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/Gdrive-direct-download.user.js
 // ==/UserScript==
 
-(function() {
-    'use strict';
-    const originalFetch = window.fetch;
-    window.fetch = async function(resource, init) {
-        try {
-            if (typeof resource === "string" && resource.includes("drive.usercontent.google.com/uc")) {
-                let url = new URL(resource);
+(function () {
+    "use strict";
 
-                let id = url.searchParams.get("id");
-                if (id) {
-                    const newUrl = `https://drive.usercontent.google.com/download?id=${id}&export=download&authuser=0&confirm=t`;
-                    window.open(newUrl, "_blank");
+    // Helper function to validate Google Drive URLs
+    function isGoogleDriveUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            // Support multiple Google Drive domains and URL patterns
+            return (
+                urlObj.hostname === 'drive.usercontent.google.com' ||
+                urlObj.hostname === 'drive.google.com'
+            ) && (
+                urlObj.pathname.includes('/uc') ||
+                urlObj.search.includes('id=') ||
+                urlObj.pathname.includes('/file/d/') ||
+                urlObj.pathname.includes('/open')
+            );
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Helper function to extract file ID and create direct download URL
+    function createDirectDownloadUrl(originalUrl) {
+        try {
+            const url = new URL(originalUrl);
+            let fileId = url.searchParams.get("id");
+
+            if (!fileId) {
+                // Try to extract ID from different URL patterns
+                const pathMatch = url.pathname.match(/\/uc\?id=([^&]+)/);
+                if (pathMatch) {
+                    fileId = pathMatch[1];
+                } else {
+                    // Handle /file/d/FILE_ID/view pattern
+                    const fileMatch = url.pathname.match(/\/file\/d\/([^\/]+)/);
+                    if (fileMatch) {
+                        fileId = fileMatch[1];
+                    } else {
+                        // Handle /open?id=FILE_ID pattern
+                        const openMatch = url.search.match(/id=([^&]+)/);
+                        if (openMatch) {
+                            fileId = openMatch[1];
+                        }
+                    }
+                }
+            }
+
+            if (fileId) {
+                // Create direct download URL with virus scan bypass
+                // Use drive.google.com/uc format which is most reliable
+                return `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+            }
+        } catch (e) {
+            console.error("Error creating direct download URL:", e);
+        }
+        return null;
+    }
+
+    // Intercept fetch requests
+    const originalFetch = window.fetch;
+    window.fetch = async function (resource, init) {
+        try {
+            if (typeof resource === "string" && isGoogleDriveUrl(resource)) {
+                const directUrl = createDirectDownloadUrl(resource);
+                if (directUrl) {
+                    console.log("Bypassing virus scan, opening direct download:", directUrl);
+                    window.open(directUrl, "_blank");
                     return new Response(null, { status: 204 });
                 }
             }
@@ -39,21 +95,60 @@
         return originalFetch.apply(this, arguments);
     };
 
-    const origOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url) {
+    // Intercept XMLHttpRequest
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    const originalXHRSend = XMLHttpRequest.prototype.send;
+
+    XMLHttpRequest.prototype.open = function (method, url, async, user, password) {
+        this._url = url;
+        this._method = method;
+        return originalXHROpen.apply(this, arguments);
+    };
+
+    XMLHttpRequest.prototype.send = function (data) {
         try {
-            if (url.includes("drive.usercontent.google.com/uc")) {
-                let u = new URL(url);
-                let id = u.searchParams.get("id");
-                if (id) {
-                    const newUrl = `https://drive.usercontent.google.com/download?id=${id}&export=download&authuser=0&confirm=t`;
-                    window.open(newUrl, "_blank");
+            if (this._url && typeof this._url === "string" && isGoogleDriveUrl(this._url)) {
+                const directUrl = createDirectDownloadUrl(this._url);
+                if (directUrl) {
+                    console.log("Bypassing virus scan via XHR, opening direct download:", directUrl);
+                    window.open(directUrl, "_blank");
+
+                    // Prevent the original request and simulate a successful response
+                    setTimeout(() => {
+                        Object.defineProperty(this, 'readyState', { value: 4 });
+                        Object.defineProperty(this, 'status', { value: 204 });
+                        Object.defineProperty(this, 'statusText', { value: 'No Content' });
+                        Object.defineProperty(this, 'responseText', { value: '' });
+
+                        if (typeof this.onreadystatechange === 'function') {
+                            this.onreadystatechange();
+                        }
+                    }, 0);
                     return;
                 }
             }
         } catch (e) {
             console.error("Error intercepting XHR:", e);
         }
-        return origOpen.apply(this, arguments);
+        return originalXHRSend.apply(this, arguments);
     };
+
+    // Additional: Handle direct clicks on download links
+    document.addEventListener('click', function (event) {
+        try {
+            const target = event.target.closest('a');
+            if (target && target.href && isGoogleDriveUrl(target.href)) {
+                const directUrl = createDirectDownloadUrl(target.href);
+                if (directUrl) {
+                    event.preventDefault();
+                    console.log("Bypassing virus scan via link click, opening direct download:", directUrl);
+                    window.open(directUrl, "_blank");
+                }
+            }
+        } catch (e) {
+            console.error("Error handling link click:", e);
+        }
+    }, true);
+
+    console.log("Google Drive Direct Download script loaded - Virus scan bypass enabled");
 })();
