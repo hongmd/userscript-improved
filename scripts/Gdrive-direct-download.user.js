@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.13
+// @version      1.2.14
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -331,8 +331,30 @@
             
             // Check if URL already has confirm=t
             if (currentUrl.includes('confirm=t')) {
-                console.log("✅ URL already has confirm=t, download should start automatically");
-                // Let the page load normally - download should start
+                console.log("✅ URL already has confirm=t, forcing download programmatically");
+                
+                // Force download programmatically since browser may not auto-download
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = currentUrl;
+                    link.download = ''; // Let browser determine filename
+                    link.style.display = 'none';
+                    
+                    // Try to trigger download
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    console.log("🔗 Forced download triggered");
+                    
+                    // If programmatic download doesn't work, show instructions
+                    setTimeout(() => {
+                        if (!document.querySelector('a[download]')) {
+                            alert(`🚀 Download should start automatically.\n\nIf not, right-click this page and "Save as..."\n\nURL: ${currentUrl}`);
+                        }
+                    }, 2000);
+                }, 500);
+                
                 return true;
             } else {
                 // Add confirm=t and redirect
