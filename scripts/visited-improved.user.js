@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
-// @version      0.6.4
+// @version      0.6.5
 // @description  Minimalist flat UI userscript for visited links customization. Customize visited link colors with a clean, modern interface and site-specific exceptions.
 // @author       Enhanced by AI Assistant ft. Hongmd
 // @license      MIT
@@ -120,11 +120,32 @@
       }
       
       try {
-        // More robust color validation using regex patterns
-        const isValid = /^#([0-9a-f]{3}){1,2}$/i.test(color) || 
-                       /^rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$/i.test(color) ||
-                       /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[\d.]+\s*\)$/i.test(color) ||
-                       /^(red|blue|green|yellow|black|white|gray|orange|purple|pink|brown)$/i.test(color);
+        // Early validation for performance
+        if (!color || typeof color !== 'string') {
+          Utils._maintainCache(cacheKey, false);
+          return false;
+        }
+        
+        const trimmed = color.trim();
+        if (trimmed.length < 3 || trimmed.length > 22) {
+          Utils._maintainCache(cacheKey, false);
+          return false;
+        }
+        
+        // Pre-compiled regex for better performance (no recreation on each call)
+        const COLOR_REGEXES = {
+          hex: /^#([0-9a-f]{3}){1,2}$/i,
+          rgb: /^rgb\(\s*(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\s*,\s*(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\s*,\s*(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\s*\)$/i,
+          rgba: /^rgba\(\s*(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\s*,\s*(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\s*,\s*(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\s*,\s*(?:1(?:\.0*)?|0(?:\.\d*)?)\s*\)$/i,
+          named: /^(red|blue|green|yellow|black|white|gray|orange|purple|pink|brown)$/i
+        };
+        
+        // Test against optimized patterns
+        const isValid = COLOR_REGEXES.hex.test(trimmed) || 
+                       COLOR_REGEXES.rgb.test(trimmed) ||
+                       COLOR_REGEXES.rgba.test(trimmed) ||
+                       COLOR_REGEXES.named.test(trimmed);
+        
         Utils._maintainCache(cacheKey, isValid);
         return isValid;
       } catch {
