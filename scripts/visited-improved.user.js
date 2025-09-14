@@ -2,7 +2,7 @@
 // @name         Visited Links Enhanced - Flat UI
 // @namespace    com.userscript.visited-links-enhanced
 // @description  Minimalist flat UI userscript for visited links customization
-// @version      0.6.2
+// @version      0.6.3
 // @match        http://*/*
 // @match        https://*/*
 // @noframes
@@ -108,15 +108,17 @@
     _unifiedCache: new Map(),
     
     isValidColor: (color) => {
-      const cacheKey = `color:${color}`;
+      const cacheKey = `valid_color:${color}`;
       if (Utils._unifiedCache.has(cacheKey)) {
         return Utils._unifiedCache.get(cacheKey);
       }
       
       try {
-        const testElement = new Option();
-        testElement.style.color = color;
-        const isValid = testElement.style.color !== "";
+        // More robust color validation using regex patterns
+        const isValid = /^#([0-9a-f]{3}){1,2}$/i.test(color) || 
+                       /^rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$/i.test(color) ||
+                       /^rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[\d.]+\s*\)$/i.test(color) ||
+                       /^(red|blue|green|yellow|black|white|gray|orange|purple|pink|brown)$/i.test(color);
         Utils._maintainCache(cacheKey, isValid);
         return isValid;
       } catch {
@@ -126,7 +128,7 @@
     },
 
     getDomain: (url) => {
-      const cacheKey = `domain:${url}`;
+      const cacheKey = `domain_extract:${url}`;
       if (Utils._unifiedCache.has(cacheKey)) {
         return Utils._unifiedCache.get(cacheKey);
       }
@@ -213,10 +215,17 @@
       const currentDomain = Utils.getDomain(url)?.toLowerCase() ?? "";
       if (!currentDomain) return false;
 
-      return raw.split(",").some(site => {
-        const cleanSite = site.trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/g, "");
+      const exceptions = raw.split(",").map(site => site.trim().toLowerCase());
+      
+      return exceptions.some(site => {
+        if (!site) return false;
+        
+        // Remove protocol and www for comparison
+        const cleanSite = site.replace(/^(https?:\/\/)?(www\.)?/g, "");
         const cleanDomain = currentDomain.replace(/^www\./g, "");
-        return cleanDomain.includes(cleanSite) || cleanSite.includes(cleanDomain);
+        
+        // Exact match or subdomain match (more precise)
+        return cleanDomain === cleanSite || cleanDomain.endsWith('.' + cleanSite);
       });
     },
 
@@ -381,30 +390,42 @@
 
       if (window.MutationObserver) {
         const observer = new MutationObserver((mutations) => {
-          let nodeCount = 0;
-          let hasLinks = false;
+          let shouldUpdate = false;
           
-          for (let i = 0; i < mutations.length && !hasLinks; i++) {
-            const addedNodes = mutations[i].addedNodes;
-            if (!addedNodes.length) continue;
+          for (let i = 0; i < mutations.length && !shouldUpdate; i++) {
+            const mutation = mutations[i];
             
-            nodeCount += addedNodes.length;
-            if (nodeCount > CONFIG.MAX_OBSERVER_NODES) {
-              hasLinks = true;
-              break;
-            }
+            // Only check childList mutations for performance
+            if (mutation.type !== 'childList') continue;
             
-            for (let j = 0; j < addedNodes.length && !hasLinks; j++) {
-              if (addedNodes[j].nodeType === 1 && addedNodes[j].tagName === 'A') {
-                hasLinks = true;
+            const addedNodes = mutation.addedNodes;
+            for (let j = 0; j < addedNodes.length && !shouldUpdate; j++) {
+              const node = addedNodes[j];
+              
+              // Check if node is element and contains links
+              if (node.nodeType === 1) {
+                // Direct link element
+                if (node.tagName === 'A') {
+                  shouldUpdate = true;
+                  break;
+                }
+                
+                // Check if element contains links (more efficient than querySelector)
+                const links = node.getElementsByTagName?.('A');
+                if (links?.length > 0) {
+                  shouldUpdate = true;
+                  break;
+                }
               }
             }
           }
           
-          if (hasLinks) debouncedUpdate();
+          if (shouldUpdate) debouncedUpdate();
         });
 
-        observer.observe(document.documentElement, {
+        // Observe body instead of documentElement for better performance
+        const target = document.body || document.documentElement;
+        observer.observe(target, {
           childList: true,
           subtree: true,
         });
@@ -432,9 +453,14 @@
     initialize();
   }
 
-  // Export for debugging
-  if (typeof window !== "undefined") {
+  // Export for debugging (only in development)
+  if (typeof window !== "undefined" && window.location?.hostname?.includes?.('localhost')) {
     window.VisitedLinksEnhanced = { config: ConfigManager, style: StyleManager, utils: Utils };
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      delete window.VisitedLinksEnhanced;
+    });
   }
 })();
 
