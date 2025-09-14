@@ -6,8 +6,8 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_registerMenuCommand
-// @version     1.7
-// @author      hongmd (simplified)
+// @version     1.7.1
+// @author      hongmd
 // @description Blocks ServiceWorker on all websites. Simple whitelist management with clear menu options.
 // @compatible  ScriptCat
 // @compatible  Tampermonkey
@@ -92,7 +92,7 @@ function removeHost() {
         console.log(`${LOG_PREFIX} Removed`, hostname, 'from whitelist');
         alert(`❌ Removed "${hostname}" from whitelist!\n\nServiceWorker will be blocked here.\nReload page to take effect.`);
     } else {
-        alert(`ℹ️ "${hostname}" is not in whitelist.`);
+        alert(`"${hostname}" is not in whitelist.`);
     }
 }
 
