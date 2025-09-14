@@ -1,10 +1,8 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
-// @name:vi      Theo Dõi Lượt Truy Cập URL (Cải Tiến)
 // @namespace    https://github.com/hongmd/userscript-improved
 // @version      2.5.3
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips. Advanced URL normalization and performance optimizations.
-// @description:vi Theo dõi lượt truy cập cho mỗi URL, hiển thị lịch sử badge góc và thông tin hover liên kết - Dung lượng khổng lồ (10K URLs) - ES2020+ và Tooltips mượt mà. Chuẩn hóa URL nâng cao và tối ưu hóa hiệu suất.
 // @author       hongmd
 // @contributor  Original idea by Chewy
 // @license      MIT

@@ -1,10 +1,8 @@
 // ==UserScript==
 // @name         Page Load Speed Monitor
-// @name:vi      Giám Sát Tốc Độ Tải Trang
 // @namespace    com.userscript.page-load-speed
 // @version      1.9.1
 // @description  Ultra-fast page load speed monitor with LCP tracking. Displays real-time loading metrics including DOM ready, load complete, and Largest Contentful Paint times.
-// @description:vi Giám sát tốc độ tải trang siêu nhanh với theo dõi LCP. Hiển thị các chỉ số tải thời gian thực bao gồm DOM ready, load complete và thời gian Largest Contentful Paint.
 // @author       Enhanced by AI Assistant
 // @license      MIT
 // @homepageURL  https://github.com/hongmd/userscript-improved

@@ -1,10 +1,8 @@
 // ==UserScript==
 // @name        Handlers Helper (Improved)
-// @name:vi     Handlers Helper (Cải tiến)
 // @namespace   Violentmonkey Scripts
 // @version     4.8.7
 // @description Helper for protocol_hook.lua - Enhanced drag-to-action system for media links with MPV integration. Supports multiple protocols (mpv://, streamlink, yt-dlp) and customizable actions.
-// @description:vi Trợ lý cho protocol_hook.lua - Hệ thống kéo-thả nâng cao cho liên kết media với tích hợp MPV. Hỗ trợ nhiều giao thức (mpv://, streamlink, yt-dlp) và hành động tùy chỉnh.
 // @author      hongmd (improved)
 // @license     MIT
 // @homepageURL https://github.com/hongmd/userscript-improved
