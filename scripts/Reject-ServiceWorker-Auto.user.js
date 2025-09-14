@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Reject ServiceWorker Auto (Simple)
 // @namespace   rejectserviceWorkerAuto
-// @version     1.7.2
+// @version     1.7.3
 // @description Blocks ServiceWorker on all websites. Simple whitelist management with clear menu options. Prevents PWA installations and background sync.
 // @author      hongmd
 // @license     MIT
@@ -22,6 +22,32 @@
 
 'use strict';
 
+// Constants for consistent messaging and configuration
+const MESSAGES = {
+    // Status messages
+    BLOCKED: "ServiceWorker registration blocked",
+    WHITELISTED: "Domain whitelisted - ServiceWorker allowed",
+    ALREADY_EXISTS: "Domain already in whitelist",
+    NOT_IN_WHITELIST: "Domain is not in whitelist",
+
+    // Alert messages
+    ADDED_TO_WHITELIST: (hostname) => `✅ Added "${hostname}" to whitelist!\n\nServiceWorker will NOT be blocked here.\nReload page to take effect.`,
+    REMOVED_FROM_WHITELIST: (hostname) => `❌ Removed "${hostname}" from whitelist!\n\nServiceWorker will be blocked here.\nReload page to take effect.`,
+    ALREADY_WHITELISTED: (hostname) => `Info: "${hostname}" is already in whitelist.`,
+    NOT_WHITELISTED: (hostname) => `"${hostname}" is not in whitelist.`,
+
+    // Error messages
+    INIT_ERROR: "Failed to initialize menu items - falling back to blocking mode",
+    STORAGE_ERROR: "Invalid stored data, resetting to empty array",
+    INJECTION_ERROR: "Failed to block ServiceWorker - using fallback method",
+
+    // Menu commands
+    SHOW_WHITELIST: "📋 Show Whitelist Info",
+    BLOCK_HERE: "🚫 Block ServiceWorker Here",
+    ALLOW_HERE: "✅ Allow ServiceWorker Here",
+    MANUAL_BLOCK: "🔧 Manual Block Now"
+};
+
 const SCRIPT_NAME = 'rejectserviceWorkerAuto';
 const STORAGE_PREFIX = `autoinject${SCRIPT_NAME}`;
 const LOG_PREFIX = 'RSA:';
@@ -31,6 +57,12 @@ console.log(`${LOG_PREFIX} Script loaded for:`, document.domain);
 let injectedStatus = false;
 let hostArray = [];
 
+/**
+ * Injects ServiceWorker blocking logic using primary and fallback methods
+ * Primary method: Overrides navigator.serviceWorker with a blocking proxy object
+ * Fallback method: Overrides the register method directly for older browsers
+ * Prevents PWA installations and background sync functionality
+ */
 function inject() {
     // Skip if running in frames or already injected
     if (window.self !== window.top) return;
@@ -49,28 +81,38 @@ function inject() {
                 writable: false,
                 configurable: false
             });
-            console.log(`${LOG_PREFIX} ServiceWorker blocked on`, document.domain);
+            console.log(`${LOG_PREFIX} ${MESSAGES.BLOCKED} on`, document.domain);
         } catch (e) {
             // Fallback method for older browsers
             navigator.serviceWorker.register = () => Promise.reject(new Error("ServiceWorker registration blocked"));
-            console.log(`${LOG_PREFIX} ServiceWorker blocked (fallback method) on`, document.domain);
+            console.warn(`${LOG_PREFIX} ${MESSAGES.INJECTION_ERROR} on`, document.domain);
         }
     }
     injectedStatus = true;
 }
 
+/**
+ * Adds the current domain to the whitelist, allowing ServiceWorker registration
+ * Updates persistent storage and provides user feedback
+ * Requires page reload to take effect
+ */
 function addHost() {
     const hostname = location.hostname;
     if (!hostArray.includes(hostname)) {
         hostArray.push(hostname);
         GM_setValue(STORAGE_PREFIX, JSON.stringify(hostArray));
         console.log(`${LOG_PREFIX} Added`, hostname, 'to whitelist');
-        alert(`✅ Added "${hostname}" to whitelist!\n\nServiceWorker will NOT be blocked here.\nReload page to take effect.`);
+        alert(MESSAGES.ADDED_TO_WHITELIST(hostname));
     } else {
-        alert(`ℹ️ "${hostname}" is already in whitelist.`);
+        alert(MESSAGES.ALREADY_WHITELISTED(hostname));
     }
 }
 
+/**
+ * Displays comprehensive whitelist information including current domain status
+ * Shows total count and lists all whitelisted domains
+ * Provides clear visual indicators for whitelist status
+ */
 function showWhitelistInfo() {
     const hostname = location.hostname;
     const isWhitelisted = hostArray.includes(hostname);
@@ -89,6 +131,11 @@ function showWhitelistInfo() {
     alert(message);
 }
 
+/**
+ * Removes the current domain from the whitelist, enabling ServiceWorker blocking
+ * Updates persistent storage and provides user feedback
+ * Requires page reload to take effect
+ */
 function removeHost() {
     const hostname = location.hostname;
     const index = hostArray.indexOf(hostname);
@@ -96,13 +143,17 @@ function removeHost() {
         hostArray.splice(index, 1);
         GM_setValue(STORAGE_PREFIX, JSON.stringify(hostArray));
         console.log(`${LOG_PREFIX} Removed`, hostname, 'from whitelist');
-        alert(`❌ Removed "${hostname}" from whitelist!\n\nServiceWorker will be blocked here.\nReload page to take effect.`);
+        alert(MESSAGES.REMOVED_FROM_WHITELIST(hostname));
     } else {
-        alert(`"${hostname}" is not in whitelist.`);
+        alert(MESSAGES.NOT_WHITELISTED(hostname));
     }
 }
 
-// Initialize and setup menu commands
+/**
+ * Initializes the script by loading stored whitelist data and setting up menu commands
+ * Handles data validation, error recovery, and dynamic menu configuration
+ * Automatically injects blocking logic for non-whitelisted domains
+ */
 function initializeScript() {
     try {
         // Safe JSON parsing with validation
@@ -111,7 +162,7 @@ function initializeScript() {
             hostArray = JSON.parse(storedData);
             // Validate that result is an array
             if (!Array.isArray(hostArray)) {
-                console.warn(`${LOG_PREFIX} Invalid stored data, resetting to empty array`);
+                console.warn(`${LOG_PREFIX} ${MESSAGES.STORAGE_ERROR}`);
                 hostArray = [];
             }
         } else {
@@ -122,21 +173,21 @@ function initializeScript() {
         const isWhitelisted = hostArray.includes(hostname);
 
         // Always show status info
-        GM_registerMenuCommand("📋 Show Whitelist Info", showWhitelistInfo);
+        GM_registerMenuCommand(MESSAGES.SHOW_WHITELIST, showWhitelistInfo);
 
         if (isWhitelisted) {
             // Current domain is whitelisted
-            GM_registerMenuCommand("🚫 Block ServiceWorker Here", removeHost);
-            GM_registerMenuCommand("🔧 Manual Block Now", inject);
-            console.log(`${LOG_PREFIX}`, hostname, 'is whitelisted - ServiceWorker allowed');
+            GM_registerMenuCommand(MESSAGES.BLOCK_HERE, removeHost);
+            GM_registerMenuCommand(MESSAGES.MANUAL_BLOCK, inject);
+            console.log(`${LOG_PREFIX}`, hostname, MESSAGES.WHITELISTED);
         } else {
             // Current domain is not whitelisted (blocked by default)
             inject();
-            GM_registerMenuCommand("✅ Allow ServiceWorker Here", addHost);
+            GM_registerMenuCommand(MESSAGES.ALLOW_HERE, addHost);
             console.log(`${LOG_PREFIX} Auto-blocked ServiceWorker for`, hostname);
         }
     } catch (err) {
-        console.error(`${LOG_PREFIX} Error: Failed to initialize menu items`);
+        console.error(`${LOG_PREFIX} ${MESSAGES.INIT_ERROR}`);
         console.error(err);
         // Fallback: always inject if there's an error
         inject();
