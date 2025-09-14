@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.6
+// @version      1.2.7
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -46,24 +46,33 @@
             const url = new URL(originalUrl);
             let fileId = url.searchParams.get("id");
 
+            console.log("🔍 Processing URL:", originalUrl);
+            console.log("🔍 URL pathname:", url.pathname);
+            console.log("🔍 URL search:", url.search);
+
             if (!fileId) {
                 // Try to extract ID from different URL patterns
                 const pathMatch = url.pathname.match(/\/uc\?id=([^&]+)/);
                 if (pathMatch) {
                     fileId = pathMatch[1];
+                    console.log("🔍 Extracted ID from /uc path:", fileId);
                 } else {
                     // Handle /file/d/FILE_ID/view pattern
                     const fileMatch = url.pathname.match(/\/file\/d\/([^\/]+)/);
                     if (fileMatch) {
                         fileId = fileMatch[1];
+                        console.log("🔍 Extracted ID from /file/d/ path:", fileId);
                     } else {
                         // Handle /open?id=FILE_ID pattern
                         const openMatch = url.search.match(/id=([^&]+)/);
                         if (openMatch) {
                             fileId = openMatch[1];
+                            console.log("🔍 Extracted ID from search params:", fileId);
                         }
                     }
                 }
+            } else {
+                console.log("🔍 Found ID in search params:", fileId);
             }
 
             if (fileId) {
@@ -72,14 +81,21 @@
                 const hasDownloadPath = url.pathname.includes('/download');
                 const hasConfirm = url.search.includes('confirm=');
                 
+                console.log("🔍 hasDownloadPath:", hasDownloadPath);
+                console.log("🔍 hasConfirm:", hasConfirm);
+                
                 if (hasDownloadPath && !hasConfirm) {
                     // Add confirm=t to existing direct download URL
                     const newUrl = new URL(url);
                     newUrl.searchParams.set('confirm', 't');
-                    return newUrl.toString();
+                    const resultUrl = newUrl.toString();
+                    console.log("🔍 Added confirm=t to existing URL:", resultUrl);
+                    return resultUrl;
                 } else {
                     // Use drive.google.com/uc format which is most reliable
-                    return `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+                    const resultUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+                    console.log("🔍 Using drive.google.com/uc format:", resultUrl);
+                    return resultUrl;
                 }
             }
         } catch (e) {
