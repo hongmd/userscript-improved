@@ -2,7 +2,7 @@
 // @name         Google Drive Direct Download - Bypass Virus Scan
 // @name:vi      Google Drive Tải Trực Tiếp - Bỏ Qua Quét Virus
 // @namespace    gdrive-direct-download
-// @version      1.2.12
+// @version      1.2.13
 // @description  Bypass Google Drive virus scan warning and download files directly. Automatically redirects to direct download links, skipping the annoying virus scan page.
 // @description:vi Bỏ qua cảnh báo quét virus của Google Drive và tải file trực tiếp. Tự động chuyển hướng đến liên kết tải trực tiếp, bỏ qua trang quét virus khó chịu.
 // @author       hongmd
@@ -174,24 +174,28 @@
         return false;
     }
 
-    // Intercept fetch requests
-    const originalFetch = window.fetch;
-    window.fetch = async function (resource, init) {
-        try {
-            if (typeof resource === "string" && isGoogleDriveUrl(resource)) {
-                console.log("🚀 Intercepting fetch request:", resource);
-                const directUrl = createDirectDownloadUrl(resource);
-                if (directUrl) {
-                    console.log("Bypassing virus scan, opening direct download:", directUrl);
-                    openDownload(directUrl);
-                    return new Response(null, { status: 204 });
+    // Intercept fetch requests (optional - may cause issues on some sites)
+    try {
+        const originalFetch = window.fetch;
+        window.fetch = async function (resource, init) {
+            try {
+                if (typeof resource === "string" && isGoogleDriveUrl(resource)) {
+                    console.log("🚀 Intercepting fetch request:", resource);
+                    const directUrl = createDirectDownloadUrl(resource);
+                    if (directUrl) {
+                        console.log("Bypassing virus scan, opening direct download:", directUrl);
+                        openDownload(directUrl);
+                        return new Response(null, { status: 204 });
+                    }
                 }
+            } catch (e) {
+                console.error("Error intercepting fetch:", e);
             }
-        } catch (e) {
-            console.error("Error intercepting fetch:", e);
-        }
-        return originalFetch.apply(this, arguments);
-    };
+            return originalFetch.apply(this, arguments);
+        };
+    } catch (e) {
+        console.warn("Fetch interception not available:", e);
+    }
 
     // Intercept XMLHttpRequest
     const originalXHROpen = XMLHttpRequest.prototype.open;
@@ -313,6 +317,41 @@
             observer.observe(document.body, { childList: true, subtree: true });
         }
     }
+    
+    // ===== DIRECT DOWNLOAD PAGE DETECTION =====
+    // If user lands directly on a download URL, trigger download immediately
+    function checkDirectDownloadPage() {
+        const currentUrl = window.location.href;
+        
+        // Check if we're directly on a Google Drive download URL
+        if (isGoogleDriveUrl(currentUrl) && 
+            (currentUrl.includes('/download') || currentUrl.includes('export=download'))) {
+            
+            console.log("🎯 Detected direct download URL, triggering download:", currentUrl);
+            
+            // Check if URL already has confirm=t
+            if (currentUrl.includes('confirm=t')) {
+                console.log("✅ URL already has confirm=t, download should start automatically");
+                // Let the page load normally - download should start
+                return true;
+            } else {
+                // Add confirm=t and redirect
+                const directUrl = createDirectDownloadUrl(currentUrl);
+                console.log("🔄 Adding confirm=t and redirecting to:", directUrl);
+                
+                setTimeout(() => {
+                    window.location.href = directUrl;
+                }, 500);
+                
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // Check immediately when script loads
+    checkDirectDownloadPage();
     
     // Test the specific URL provided by user
     const testUrl = "https://drive.usercontent.google.com/download?id=1MExRoVwC9nwWn5LviZbJ8GgjEjp8syhz&export=download&authuser=0";
