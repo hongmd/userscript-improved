@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name        Reject ServiceWorker Auto (Simple)
 // @namespace   rejectserviceWorkerAuto
-// @version     1.7.3
-// @description Blocks ServiceWorker on all websites. Simple whitelist management with clear menu options. Prevents PWA installations and background sync.
+// @version     1.7.5
+// @description Blocks ServiceWorker on all websites. Advanced whitelist management with manual domain removal. Prevents PWA installations and background sync.
 // @author      hongmd
 // @license     MIT
 // @homepageURL https://github.com/hongmd/userscript-improved
@@ -35,6 +35,9 @@ const MESSAGES = {
     REMOVED_FROM_WHITELIST: (hostname) => `❌ Removed "${hostname}" from whitelist!\n\nServiceWorker will be blocked here.\nReload page to take effect.`,
     ALREADY_WHITELISTED: (hostname) => `Info: "${hostname}" is already in whitelist.`,
     NOT_WHITELISTED: (hostname) => `"${hostname}" is not in whitelist.`,
+    WHITELIST_EMPTY: "📋 Whitelist is empty!\n\nNo domains to remove.",
+    DOMAIN_NOT_FOUND: (domain, currentList) => `❌ Domain "${domain}" not found in whitelist.\n\nCurrent whitelist: ${currentList}`,
+    MANUAL_REMOVAL_SUCCESS: (domain) => `✅ Removed "${domain}" from whitelist!\n\nServiceWorker will be blocked on this domain.\nReload the page if you're currently on it.`,
 
     // Error messages
     INIT_ERROR: "Failed to initialize menu items - falling back to blocking mode",
@@ -45,7 +48,8 @@ const MESSAGES = {
     SHOW_WHITELIST: "📋 Show Whitelist Info",
     BLOCK_HERE: "🚫 Block ServiceWorker Here",
     ALLOW_HERE: "✅ Allow ServiceWorker Here",
-    MANUAL_BLOCK: "🔧 Manual Block Now"
+    MANUAL_BLOCK: "🔧 Manual Block Now",
+    REMOVE_FROM_WHITELIST: "🗑️ Remove from Whitelist"
 };
 
 const SCRIPT_NAME = 'rejectserviceWorkerAuto';
@@ -150,6 +154,38 @@ function removeHost() {
 }
 
 /**
+ * Allows user to remove any domain from the whitelist by entering it manually
+ * Provides a text input dialog for domain removal
+ * Useful for managing whitelist without visiting each domain
+ */
+function removeFromWhitelist() {
+    if (hostArray.length === 0) {
+        alert(MESSAGES.WHITELIST_EMPTY);
+        return;
+    }
+
+    const currentList = hostArray.join(", ");
+    const domainToRemove = prompt(
+        `🗑️ Remove domain from whitelist:\n\nCurrent whitelist: ${currentList}\n\nEnter domain to remove (without https://):`,
+        ""
+    );
+
+    if (!domainToRemove?.trim()) return;
+
+    const cleanDomain = domainToRemove.trim().toLowerCase();
+    const index = hostArray.findIndex(host => host.toLowerCase() === cleanDomain);
+
+    if (index > -1) {
+        const removedDomain = hostArray.splice(index, 1)[0];
+        GM_setValue(STORAGE_PREFIX, JSON.stringify(hostArray));
+        console.log(`${LOG_PREFIX} Manually removed`, removedDomain, 'from whitelist');
+        alert(MESSAGES.MANUAL_REMOVAL_SUCCESS(removedDomain));
+    } else {
+        alert(MESSAGES.DOMAIN_NOT_FOUND(cleanDomain, currentList));
+    }
+}
+
+/**
  * Initializes the script by loading stored whitelist data and setting up menu commands
  * Handles data validation, error recovery, and dynamic menu configuration
  * Automatically injects blocking logic for non-whitelisted domains
@@ -174,6 +210,7 @@ function initializeScript() {
 
         // Always show status info
         GM_registerMenuCommand(MESSAGES.SHOW_WHITELIST, showWhitelistInfo);
+        GM_registerMenuCommand(MESSAGES.REMOVE_FROM_WHITELIST, removeFromWhitelist);
 
         if (isWhitelisted) {
             // Current domain is whitelisted
