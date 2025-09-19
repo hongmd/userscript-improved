@@ -1,0 +1,24 @@
+{
+  "name": "userscript-improved",
+  "version": "1.0.0",
+  "description": "Bộ sưu tập userscripts hiệu suất cao để cải thiện trải nghiệm duyệt web.",
+  "main": "build-minify.js",
+  "scripts": {
+    "build:min": "node build-minify.js",
+    "test": "echo \"No tests\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hongmd/userscript-improved.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hongmd/userscript-improved/issues"
+  },
+  "homepage": "https://github.com/hongmd/userscript-improved#readme",
+  "devDependencies": {
+    "terser": "^5.44.0"
+  }
+}
