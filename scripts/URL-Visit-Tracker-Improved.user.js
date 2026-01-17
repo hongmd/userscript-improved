@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version      2.5.5
+// @version      2.5.6
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips. Advanced URL normalization and performance optimizations.
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -1043,6 +1043,16 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   let currentHoveredLink = null;
   let rafId = null; // RequestAnimationFrame ID for smooth tooltip movement
   let pendingTooltipPosition = null; // Store pending position updates
+  let tooltipAutoHideTimer = null; // Auto-hide timer to prevent stuck tooltips
+  let tooltipValidationTimer = null; // Timer to validate tooltip state
+  let lastMousePosition = { x: 0, y: 0 }; // Track last mouse position
+
+  // Configuration for tooltip anti-stick measures
+  const TOOLTIP_CONFIG = {
+    AUTO_HIDE_DELAY: 10000,   // Auto-hide after 10 seconds
+    VALIDATION_INTERVAL: 500, // Check every 500ms if tooltip should still be visible
+    STALE_THRESHOLD: 2000     // Consider tooltip stale if no mouse movement for 2s
+  };
 
   function showTooltip(e, linkUrl) {
     const key = normalizeUrl(linkUrl);
@@ -1072,6 +1082,80 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     // Set initial position
     updateTooltipPosition(e.clientX, e.clientY);
     tooltip.style.opacity = 1;
+
+    // Start auto-hide timer as safety net
+    startAutoHideTimer();
+
+    // Start validation timer to check if tooltip should still be visible
+    startValidationTimer();
+  }
+
+  // Auto-hide timer - safety net to prevent stuck tooltips
+  function startAutoHideTimer() {
+    clearAutoHideTimer();
+    tooltipAutoHideTimer = setTimeout(() => {
+      if (CONFIG.DEBUG) {
+        console.log('⏰ Tooltip auto-hide triggered after timeout');
+      }
+      hideTooltip();
+    }, TOOLTIP_CONFIG.AUTO_HIDE_DELAY);
+  }
+
+  function clearAutoHideTimer() {
+    if (tooltipAutoHideTimer) {
+      clearTimeout(tooltipAutoHideTimer);
+      tooltipAutoHideTimer = null;
+    }
+  }
+
+  // Validation timer - periodically check if tooltip should still be visible
+  function startValidationTimer() {
+    clearValidationTimer();
+    tooltipValidationTimer = setInterval(() => {
+      if (!validateTooltipState()) {
+        if (CONFIG.DEBUG) {
+          console.log('🔍 Tooltip validation failed, hiding tooltip');
+        }
+        hideTooltip();
+      }
+    }, TOOLTIP_CONFIG.VALIDATION_INTERVAL);
+  }
+
+  function clearValidationTimer() {
+    if (tooltipValidationTimer) {
+      clearInterval(tooltipValidationTimer);
+      tooltipValidationTimer = null;
+    }
+  }
+
+  // Validate if tooltip should still be visible
+  function validateTooltipState() {
+    // No link being tracked - tooltip shouldn't be visible
+    if (!currentHoveredLink) {
+      return false;
+    }
+
+    // Link was removed from DOM
+    if (!document.body.contains(currentHoveredLink)) {
+      if (CONFIG.DEBUG) {
+        console.log('🔗 Link removed from DOM, invalidating tooltip');
+      }
+      return false;
+    }
+
+    // Check if mouse is still over the link using elementFromPoint
+    const elementAtMouse = document.elementFromPoint(lastMousePosition.x, lastMousePosition.y);
+    if (elementAtMouse) {
+      const linkAtMouse = safeClosest(elementAtMouse, 'a[href]');
+      if (linkAtMouse !== currentHoveredLink) {
+        if (CONFIG.DEBUG) {
+          console.log('🔗 Mouse no longer over tracked link');
+        }
+        return false;
+      }
+    }
+
+    return true;
   }
 
   function updateTooltipPosition(x, y) {
@@ -1105,11 +1189,22 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     }
     pendingTooltipPosition = null;
 
+    // Clear all timers
+    clearAutoHideTimer();
+    clearValidationTimer();
+
     // Ensure mousemove listener is properly removed
     document.removeEventListener('mousemove', moveTooltip);
   }
 
   function moveTooltip(e) {
+    // Track mouse position for validation
+    lastMousePosition.x = e.clientX;
+    lastMousePosition.y = e.clientY;
+
+    // Reset auto-hide timer on mouse movement (user is still active)
+    startAutoHideTimer();
+
     // Use requestAnimationFrame for smooth movement
     updateTooltipPosition(e.clientX, e.clientY);
   }
@@ -1132,6 +1227,10 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     }
 
     currentHoveredLink = a;
+
+    // Track initial mouse position
+    lastMousePosition.x = e.clientX;
+    lastMousePosition.y = e.clientY;
 
     clearTimeout(hoverTimer);
     hoverTimer = setTimeout(() => showTooltip(e, href), CONFIG.HOVER_DELAY);
@@ -1168,6 +1267,22 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     clearTimeout(hoverTimer);
     hideTooltip();
   }, { passive: true });
+
+  // Additional safety: hide tooltip when clicking anywhere
+  document.addEventListener('click', () => {
+    if (currentHoveredLink) {
+      clearTimeout(hoverTimer);
+      hideTooltip();
+    }
+  }, { passive: true });
+
+  // Additional safety: hide tooltip when scrolling
+  document.addEventListener('scroll', () => {
+    if (currentHoveredLink) {
+      clearTimeout(hoverTimer);
+      hideTooltip();
+    }
+  }, { passive: true, capture: true });
 
   // Initialize the tracker
   function initializeTracker() {
@@ -1217,6 +1332,11 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
         // Tab became hidden - pause polling if configured
         if (CONFIG.POLLING.PAUSE_WHEN_HIDDEN) {
           stopPolling();
+        }
+        // Hide tooltip when tab is hidden to prevent stuck tooltips
+        if (currentHoveredLink) {
+          clearTimeout(hoverTimer);
+          hideTooltip();
         }
       } else {
         // Tab became visible - resume polling if it was paused
