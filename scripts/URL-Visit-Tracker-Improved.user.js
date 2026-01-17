@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version      2.6.0
+// @version      2.7.0
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips. Advanced URL normalization and performance optimizations.
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -666,13 +666,12 @@
 
   function registerMenu() {
     // Register static menu items once to prevent duplicates
+    GM_registerMenuCommand('⚙️ Settings', openSettingsPanel);
     GM_registerMenuCommand('👁️ Toggle Badge', toggleBadgeVisibility);
     GM_registerMenuCommand('📊 Export Data', exportData);
     GM_registerMenuCommand('📈 Show Statistics', showStatistics);
     GM_registerMenuCommand('🗑️ Clear Current Page', clearCurrentPage);
     GM_registerMenuCommand('💥 Clear All Data', clearAllData);
-    GM_registerMenuCommand('🚫 Toggle URL Filtering', toggleUrlFiltering);
-    GM_registerMenuCommand('🔍 Toggle Search URL Cleaning', toggleSearchCleaning);
     GM_registerMenuCommand('🐛 Toggle Debug Mode', toggleDebugMode);
   }
 
@@ -948,6 +947,635 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     if (CONFIG.DEBUG) {
       console.log('🐛 Visit Tracker Debug Mode: ENABLED');
+    }
+  }
+
+  // ============================================
+  // SETTINGS PANEL UI
+  // ============================================
+
+  let settingsPanel = null;
+  let settingsPanelOpen = false;
+
+  function getSettingsPanelStyles() {
+    return `
+      .vt-settings-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 2147483646;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .vt-settings-overlay.visible {
+        opacity: 1;
+      }
+      .vt-settings-panel {
+        background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 16px;
+        box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+        width: 480px;
+        max-width: 95vw;
+        max-height: 85vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transform: scale(0.9) translateY(20px);
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      .vt-settings-overlay.visible .vt-settings-panel {
+        transform: scale(1) translateY(0);
+      }
+      .vt-settings-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .vt-settings-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .vt-settings-title::before {
+        content: '⚙️';
+        font-size: 20px;
+      }
+      .vt-settings-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .vt-settings-close:hover {
+        background: rgba(239, 68, 68, 0.8);
+        transform: scale(1.05);
+      }
+      .vt-settings-body {
+        padding: 16px 24px;
+        overflow-y: auto;
+        flex: 1;
+      }
+      .vt-settings-section {
+        margin-bottom: 20px;
+      }
+      .vt-settings-section:last-child {
+        margin-bottom: 0;
+      }
+      .vt-section-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #818cf8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .vt-setting-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        transition: background 0.15s ease;
+      }
+      .vt-setting-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .vt-setting-label {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .vt-setting-name {
+        font-size: 14px;
+        color: #e2e8f0;
+        font-weight: 500;
+      }
+      .vt-setting-desc {
+        font-size: 11px;
+        color: #64748b;
+      }
+      .vt-toggle {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      .vt-toggle.active {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      }
+      .vt-toggle::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      .vt-toggle.active::after {
+        transform: translateX(20px);
+      }
+      .vt-input-number {
+        width: 80px;
+        padding: 6px 10px;
+        background: rgba(30, 30, 50, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        color: #ffffff !important;
+        font-size: 13px;
+        font-weight: 500;
+        text-align: center;
+        transition: all 0.15s ease;
+        -webkit-appearance: textfield;
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+      .vt-input-number::-webkit-outer-spin-button,
+      .vt-input-number::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      .vt-input-number:focus {
+        outline: none;
+        border-color: #6366f1;
+        background: rgba(99, 102, 241, 0.2) !important;
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+      }
+      .vt-settings-footer {
+        padding: 16px 24px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.2);
+      }
+      .vt-btn {
+        flex: 1;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .vt-btn-primary {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: #fff;
+      }
+      .vt-btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+      }
+      .vt-btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+      }
+      .vt-btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+      .vt-toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        z-index: 2147483647;
+        opacity: 0;
+        transition: all 0.3s ease;
+      }
+      .vt-toast.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    `;
+  }
+
+  function createSettingsPanel() {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'vt-settings-overlay';
+    overlay.id = 'vt-settings-overlay';
+
+    // Create panel HTML
+    overlay.innerHTML = `
+      <div class="vt-settings-panel">
+        <div class="vt-settings-header">
+          <div class="vt-settings-title">URL Visit Tracker Settings</div>
+          <button class="vt-settings-close" id="vt-close-settings">✕</button>
+        </div>
+        <div class="vt-settings-body">
+          <!-- General Section -->
+          <div class="vt-settings-section">
+            <div class="vt-section-title">🎯 General</div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Show Badge</span>
+                <span class="vt-setting-desc">Display visit counter badge on screen</span>
+              </div>
+              <div class="vt-toggle ${badgeVisible ? 'active' : ''}" data-setting="badgeVisible"></div>
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Debug Mode</span>
+                <span class="vt-setting-desc">Enable console logging for debugging</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.DEBUG ? 'active' : ''}" data-setting="debug"></div>
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Hover Delay</span>
+                <span class="vt-setting-desc">Delay before showing tooltip (ms)</span>
+              </div>
+              <input type="number" class="vt-input-number" value="${CONFIG.HOVER_DELAY}" data-setting="hoverDelay" min="0" max="5000" step="100">
+            </div>
+          </div>
+
+          <!-- URL Normalization Section -->
+          <div class="vt-settings-section">
+            <div class="vt-section-title">🔗 URL Normalization</div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Remove Query Params</span>
+                <span class="vt-setting-desc">Ignore ?key=value in URLs</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.NORMALIZE_URL.REMOVE_QUERY ? 'active' : ''}" data-setting="removeQuery"></div>
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Remove Hash</span>
+                <span class="vt-setting-desc">Ignore #section in URLs</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.NORMALIZE_URL.REMOVE_HASH ? 'active' : ''}" data-setting="removeHash"></div>
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Clean Search URLs</span>
+                <span class="vt-setting-desc">Group search results by query</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS ? 'active' : ''}" data-setting="cleanSearchUrls"></div>
+            </div>
+          </div>
+
+          <!-- URL Filtering Section -->
+          <div class="vt-settings-section">
+            <div class="vt-section-title">🚫 URL Filtering</div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Skip Utility Pages</span>
+                <span class="vt-setting-desc">Don't track login, cookie pages, etc.</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES ? 'active' : ''}" data-setting="skipUtilityPages"></div>
+            </div>
+          </div>
+
+          <!-- Performance Section -->
+          <div class="vt-settings-section">
+            <div class="vt-section-title">⚡ Performance</div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Debounce Writes</span>
+                <span class="vt-setting-desc">Batch database writes for better performance</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.DEBOUNCE.ENABLED ? 'active' : ''}" data-setting="debounceEnabled"></div>
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Debounce Delay</span>
+                <span class="vt-setting-desc">Delay before writing to storage (ms)</span>
+              </div>
+              <input type="number" class="vt-input-number" value="${CONFIG.DEBOUNCE.DELAY}" data-setting="debounceDelay" min="100" max="5000" step="100">
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Use Web Worker</span>
+                <span class="vt-setting-desc">Run cleanup in background thread</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.WEB_WORKER.ENABLED ? 'active' : ''}" data-setting="webWorkerEnabled"></div>
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Pause When Hidden</span>
+                <span class="vt-setting-desc">Stop polling when tab is not visible</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.POLLING.PAUSE_WHEN_HIDDEN ? 'active' : ''}" data-setting="pauseWhenHidden"></div>
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Adaptive Polling</span>
+                <span class="vt-setting-desc">Adjust polling frequency based on activity</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.POLLING.ADAPTIVE ? 'active' : ''}" data-setting="adaptivePolling"></div>
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Poll Interval</span>
+                <span class="vt-setting-desc">URL change check interval (ms)</span>
+              </div>
+              <input type="number" class="vt-input-number" value="${CONFIG.POLL_INTERVAL}" data-setting="pollInterval" min="1000" max="30000" step="1000">
+            </div>
+          </div>
+
+          <!-- Storage Section -->
+          <div class="vt-settings-section">
+            <div class="vt-section-title">💾 Storage</div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Max URLs Stored</span>
+                <span class="vt-setting-desc">Maximum number of URLs to track</span>
+              </div>
+              <input type="number" class="vt-input-number" value="${CONFIG.MAX_URLS_STORED}" data-setting="maxUrlsStored" min="1000" max="50000" step="1000">
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Max Visits per URL</span>
+                <span class="vt-setting-desc">Visit timestamps to keep per URL</span>
+              </div>
+              <input type="number" class="vt-input-number" value="${CONFIG.MAX_VISITS_STORED}" data-setting="maxVisitsStored" min="5" max="100" step="5">
+            </div>
+            <div class="vt-setting-row">
+              <div class="vt-setting-label">
+                <span class="vt-setting-name">Multi-Tab Sync</span>
+                <span class="vt-setting-desc">Sync data across browser tabs</span>
+              </div>
+              <div class="vt-toggle ${CONFIG.MULTI_TAB.ENABLED ? 'active' : ''}" data-setting="multiTabEnabled"></div>
+            </div>
+          </div>
+        </div>
+        <div class="vt-settings-footer">
+          <button class="vt-btn vt-btn-secondary" id="vt-reset-settings">Reset to Defaults</button>
+          <button class="vt-btn vt-btn-primary" id="vt-save-settings">Save Settings</button>
+        </div>
+      </div>
+    `;
+
+    return overlay;
+  }
+
+  function openSettingsPanel() {
+    if (settingsPanelOpen) return;
+
+    // Add styles if not already added
+    if (!document.getElementById('vt-settings-styles')) {
+      const style = document.createElement('style');
+      style.id = 'vt-settings-styles';
+      style.textContent = getSettingsPanelStyles();
+      document.head.appendChild(style);
+    }
+
+    // Create and add panel
+    settingsPanel = createSettingsPanel();
+    document.body.appendChild(settingsPanel);
+    settingsPanelOpen = true;
+
+    // Trigger animation
+    requestAnimationFrame(() => {
+      settingsPanel.classList.add('visible');
+    });
+
+    // Add event listeners
+    setupSettingsEventListeners();
+  }
+
+  // ESC key handler for settings panel (moved outside for proper cleanup)
+  let settingsEscHandler = null;
+
+  function closeSettingsPanel() {
+    if (!settingsPanel || !settingsPanelOpen) return;
+
+    // Remove ESC handler to prevent memory leak
+    if (settingsEscHandler) {
+      document.removeEventListener('keydown', settingsEscHandler);
+      settingsEscHandler = null;
+    }
+
+    settingsPanel.classList.remove('visible');
+
+    setTimeout(() => {
+      if (settingsPanel && settingsPanel.parentNode) {
+        settingsPanel.parentNode.removeChild(settingsPanel);
+      }
+      settingsPanel = null;
+      settingsPanelOpen = false;
+    }, 200);
+  }
+
+  function setupSettingsEventListeners() {
+    // Close button
+    document.getElementById('vt-close-settings').addEventListener('click', closeSettingsPanel);
+
+    // Click outside to close
+    settingsPanel.addEventListener('click', (e) => {
+      if (e.target === settingsPanel) {
+        closeSettingsPanel();
+      }
+    });
+
+    // ESC key to close - use the outer variable for proper cleanup
+    settingsEscHandler = (e) => {
+      if (e.key === 'Escape' && settingsPanelOpen) {
+        closeSettingsPanel();
+      }
+    };
+    document.addEventListener('keydown', settingsEscHandler);
+
+    // Toggle switches
+    settingsPanel.querySelectorAll('.vt-toggle').forEach(toggle => {
+      toggle.addEventListener('click', () => {
+        toggle.classList.toggle('active');
+      });
+    });
+
+    // Save button
+    document.getElementById('vt-save-settings').addEventListener('click', saveSettings);
+
+    // Reset button
+    document.getElementById('vt-reset-settings').addEventListener('click', resetSettings);
+  }
+
+  function saveSettings() {
+    try {
+      // Read all settings from UI
+      const getToggle = (name) => settingsPanel.querySelector(`[data-setting="${name}"]`).classList.contains('active');
+      const getNumber = (name) => parseInt(settingsPanel.querySelector(`[data-setting="${name}"]`).value, 10);
+
+      // Update CONFIG
+      badgeVisible = getToggle('badgeVisible');
+      CONFIG.DEBUG = getToggle('debug');
+      CONFIG.HOVER_DELAY = getNumber('hoverDelay');
+      CONFIG.NORMALIZE_URL.REMOVE_QUERY = getToggle('removeQuery');
+      CONFIG.NORMALIZE_URL.REMOVE_HASH = getToggle('removeHash');
+      CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = getToggle('cleanSearchUrls');
+      CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = getToggle('skipUtilityPages');
+      CONFIG.DEBOUNCE.ENABLED = getToggle('debounceEnabled');
+      CONFIG.DEBOUNCE.DELAY = getNumber('debounceDelay');
+      CONFIG.WEB_WORKER.ENABLED = getToggle('webWorkerEnabled');
+      CONFIG.POLLING.PAUSE_WHEN_HIDDEN = getToggle('pauseWhenHidden');
+      CONFIG.POLLING.ADAPTIVE = getToggle('adaptivePolling');
+      CONFIG.POLL_INTERVAL = getNumber('pollInterval');
+      CONFIG.MAX_URLS_STORED = getNumber('maxUrlsStored');
+      CONFIG.MAX_VISITS_STORED = getNumber('maxVisitsStored');
+      CONFIG.MULTI_TAB.ENABLED = getToggle('multiTabEnabled');
+
+      // Persist to GM storage
+      GM_setValue('badgeVisible', badgeVisible);
+      GM_setValue('debugMode', CONFIG.DEBUG);
+      GM_setValue('hoverDelay', CONFIG.HOVER_DELAY);
+      GM_setValue('removeQuery', CONFIG.NORMALIZE_URL.REMOVE_QUERY);
+      GM_setValue('removeHash', CONFIG.NORMALIZE_URL.REMOVE_HASH);
+      GM_setValue('searchCleaning', CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS);
+      GM_setValue('urlFiltering', CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES);
+      GM_setValue('debounceEnabled', CONFIG.DEBOUNCE.ENABLED);
+      GM_setValue('debounceDelay', CONFIG.DEBOUNCE.DELAY);
+      GM_setValue('webWorkerEnabled', CONFIG.WEB_WORKER.ENABLED);
+      GM_setValue('pauseWhenHidden', CONFIG.POLLING.PAUSE_WHEN_HIDDEN);
+      GM_setValue('adaptivePolling', CONFIG.POLLING.ADAPTIVE);
+      GM_setValue('pollInterval', CONFIG.POLL_INTERVAL);
+      GM_setValue('maxUrlsStored', CONFIG.MAX_URLS_STORED);
+      GM_setValue('maxVisitsStored', CONFIG.MAX_VISITS_STORED);
+      GM_setValue('multiTabEnabled', CONFIG.MULTI_TAB.ENABLED);
+
+      // Update badge visibility
+      const badge = document.getElementById('vt-hover-badge');
+      if (badge) {
+        badge.classList.toggle('hidden', !badgeVisible);
+      }
+
+      // Restart polling with new settings
+      stopPolling();
+      startPolling();
+
+      // Show success toast
+      showToast('✅ Settings saved successfully!');
+
+      // Close panel
+      closeSettingsPanel();
+
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      showToast('❌ Failed to save settings');
+    }
+  }
+
+  function resetSettings() {
+    if (!confirm('Reset all settings to default values?')) return;
+
+    // Default values
+    const defaults = {
+      badgeVisible: true,
+      debug: false,
+      hoverDelay: 1000,
+      removeQuery: false,
+      removeHash: true,
+      cleanSearchUrls: true,
+      skipUtilityPages: true,
+      debounceEnabled: true,
+      debounceDelay: 1000,
+      webWorkerEnabled: true,
+      pauseWhenHidden: true,
+      adaptivePolling: true,
+      pollInterval: 5000,
+      maxUrlsStored: 10000,
+      maxVisitsStored: 20,
+      multiTabEnabled: false
+    };
+
+    // Update UI
+    Object.entries(defaults).forEach(([key, value]) => {
+      const element = settingsPanel.querySelector(`[data-setting="${key}"]`);
+      if (element) {
+        if (element.classList.contains('vt-toggle')) {
+          element.classList.toggle('active', value);
+        } else {
+          element.value = value;
+        }
+      }
+    });
+
+    showToast('🔄 Settings reset to defaults');
+  }
+
+  function showToast(message) {
+    // Remove existing toast
+    const existingToast = document.querySelector('.vt-toast');
+    if (existingToast) {
+      existingToast.remove();
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'vt-toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.classList.add('visible');
+    });
+
+    setTimeout(() => {
+      toast.classList.remove('visible');
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
+  }
+
+  // Load all saved settings on initialization
+  function loadSavedSettings() {
+    try {
+      badgeVisible = GM_getValue('badgeVisible', CONFIG.BADGE_VISIBLE);
+      CONFIG.DEBUG = GM_getValue('debugMode', CONFIG.DEBUG);
+      CONFIG.HOVER_DELAY = GM_getValue('hoverDelay', CONFIG.HOVER_DELAY);
+      CONFIG.NORMALIZE_URL.REMOVE_QUERY = GM_getValue('removeQuery', CONFIG.NORMALIZE_URL.REMOVE_QUERY);
+      CONFIG.NORMALIZE_URL.REMOVE_HASH = GM_getValue('removeHash', CONFIG.NORMALIZE_URL.REMOVE_HASH);
+      CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = GM_getValue('searchCleaning', CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS);
+      CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = GM_getValue('urlFiltering', CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES);
+      CONFIG.DEBOUNCE.ENABLED = GM_getValue('debounceEnabled', CONFIG.DEBOUNCE.ENABLED);
+      CONFIG.DEBOUNCE.DELAY = GM_getValue('debounceDelay', CONFIG.DEBOUNCE.DELAY);
+      CONFIG.WEB_WORKER.ENABLED = GM_getValue('webWorkerEnabled', CONFIG.WEB_WORKER.ENABLED);
+      CONFIG.POLLING.PAUSE_WHEN_HIDDEN = GM_getValue('pauseWhenHidden', CONFIG.POLLING.PAUSE_WHEN_HIDDEN);
+      CONFIG.POLLING.ADAPTIVE = GM_getValue('adaptivePolling', CONFIG.POLLING.ADAPTIVE);
+      CONFIG.POLL_INTERVAL = GM_getValue('pollInterval', CONFIG.POLL_INTERVAL);
+      CONFIG.MAX_URLS_STORED = GM_getValue('maxUrlsStored', CONFIG.MAX_URLS_STORED);
+      CONFIG.MAX_VISITS_STORED = GM_getValue('maxVisitsStored', CONFIG.MAX_VISITS_STORED);
+      CONFIG.MULTI_TAB.ENABLED = GM_getValue('multiTabEnabled', CONFIG.MULTI_TAB.ENABLED);
+    } catch (error) {
+      console.warn('Failed to load saved settings:', error);
     }
   }
 
@@ -1455,37 +2083,8 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
   // Initialize the tracker
   function initializeTracker() {
-    // Load saved badge visibility state
-    try {
-      badgeVisible = GM_getValue('badgeVisible', CONFIG.BADGE_VISIBLE);
-    } catch (error) {
-      console.warn('Failed to load badge visibility state:', error);
-      badgeVisible = CONFIG.BADGE_VISIBLE;
-    }
-
-    // Load saved debug mode state
-    try {
-      CONFIG.DEBUG = GM_getValue('debugMode', CONFIG.DEBUG);
-    } catch (error) {
-      console.warn('Failed to load debug mode state:', error);
-      CONFIG.DEBUG = false;
-    }
-
-    // Load saved URL filtering state
-    try {
-      CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = GM_getValue('urlFiltering', CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES);
-    } catch (error) {
-      console.warn('Failed to load URL filtering state:', error);
-      CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = true;
-    }
-
-    // Load saved search cleaning state
-    try {
-      CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = GM_getValue('searchCleaning', CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS);
-    } catch (error) {
-      console.warn('Failed to load search cleaning state:', error);
-      CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = true;
-    }
+    // Load all saved settings
+    loadSavedSettings();
 
     if (CONFIG.DEBUG) {
       console.log('🐛 Visit Tracker Debug Mode: ENABLED');
