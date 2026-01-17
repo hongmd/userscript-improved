@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version      2.5.6
+// @version      2.6.0
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips. Advanced URL normalization and performance optimizations.
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -41,6 +41,16 @@
     MULTI_TAB: {
       ENABLED: false,               // Set to true to enable multi-tab cache coordination
       SYNC_INTERVAL: 10000          // How often to sync cache across tabs (ms)
+    },
+    // Debounce settings for database writes
+    DEBOUNCE: {
+      ENABLED: true,                // Enable debounced writes for better performance
+      DELAY: 1000                   // Delay in ms before writing to storage
+    },
+    // Web Worker for heavy operations
+    WEB_WORKER: {
+      ENABLED: true,                // Use Web Worker for cleanup operations
+      TIMEOUT: 15000                // Timeout for worker operations (ms)
     },
     // URL normalization options
     NORMALIZE_URL: {
@@ -347,7 +357,7 @@
   }
 
   // Smart cleanup to maintain database size with performance optimization
-  // Always returns a Promise for consistent async handling
+  // Uses Web Worker for heavy computation to avoid blocking UI
   async function cleanupOldUrls(db) {
     const urls = Object.keys(db);
     if (urls.length <= CONFIG.MAX_URLS_STORED) return db;
@@ -356,41 +366,120 @@
       console.log(`🧹 Large database cleanup: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
     }
 
-    // Cleanup logic extracted for reuse
-    const performCleanup = () => {
+    // Cleanup logic - can run in main thread or Web Worker
+    const performCleanup = (dbData, maxUrls) => {
+      const urlKeys = Object.keys(dbData);
       // Calculate score for each URL (visits * recency)
-      const scored = urls.map(url => {
-        const data = db[url];
-        const recentVisit = data.visits?.[0] ?? 0;  // Optional chaining + nullish coalescing
+      const scored = urlKeys.map(url => {
+        const data = dbData[url];
+        const recentVisit = data.visits?.[0] ?? 0;
         const daysSinceVisit = (Date.now() - recentVisit) / (1000 * 60 * 60 * 24);
-        const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30; // 0-1 based on last 30 days
-        const score = data.count * (1 + recencyScore); // Visits weighted by recency
-
-        return { url, score, count: data.count, lastVisit: recentVisit };
+        const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30;
+        const score = data.count * (1 + recencyScore);
+        return { url, score };
       });
 
-      // Keep top 10,000 URLs by score - massive capacity
+      // Keep top URLs by score
       scored.sort((a, b) => b.score - a.score);
-      const keepUrls = scored.slice(0, CONFIG.MAX_URLS_STORED);
+      const keepUrls = scored.slice(0, maxUrls);
 
-      // Use Object.fromEntries for more modern approach (ES2019)
-      const cleanDb = Object.fromEntries(
-        keepUrls.map(({ url }) => [url, db[url]])
-      );
-
+      // Build clean database
+      const cleanDb = {};
+      for (const { url } of keepUrls) {
+        cleanDb[url] = dbData[url];
+      }
       return cleanDb;
     };
 
-    // Use requestIdleCallback for non-blocking cleanup on large databases
-    if (window.requestIdleCallback && urls.length > 5000) {
+    // Try Web Worker for large databases
+    if (CONFIG.WEB_WORKER.ENABLED && urls.length > 5000 && typeof Worker !== 'undefined') {
+      try {
+        return await runCleanupInWorker(db, CONFIG.MAX_URLS_STORED);
+      } catch (error) {
+        if (CONFIG.DEBUG) {
+          console.warn('🔧 Web Worker cleanup failed, falling back to main thread:', error);
+        }
+        // Fallback to main thread
+      }
+    }
+
+    // Use requestIdleCallback for medium databases, or run directly for small ones
+    if (window.requestIdleCallback && urls.length > 3000) {
       return new Promise(resolve => {
         requestIdleCallback(() => {
-          resolve(performCleanup());
-        }, { timeout: 10000 }); // 10s timeout fallback
+          resolve(performCleanup(db, CONFIG.MAX_URLS_STORED));
+        }, { timeout: 10000 });
       });
-    } else {
-      return performCleanup();
     }
+
+    return performCleanup(db, CONFIG.MAX_URLS_STORED);
+  }
+
+  // Web Worker implementation for cleanup (runs in separate thread)
+  function runCleanupInWorker(db, maxUrls) {
+    return new Promise((resolve, reject) => {
+      // Create worker code as a Blob (works in userscript context)
+      const workerCode = `
+        self.onmessage = function(e) {
+          const { db, maxUrls } = e.data;
+          const urls = Object.keys(db);
+          
+          // Calculate scores
+          const scored = urls.map(url => {
+            const data = db[url];
+            const recentVisit = data.visits?.[0] ?? 0;
+            const daysSinceVisit = (Date.now() - recentVisit) / (1000 * 60 * 60 * 24);
+            const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30;
+            const score = data.count * (1 + recencyScore);
+            return { url, score };
+          });
+          
+          // Sort and keep top URLs
+          scored.sort((a, b) => b.score - a.score);
+          const keepUrls = scored.slice(0, maxUrls);
+          
+          // Build clean database
+          const cleanDb = {};
+          for (const { url } of keepUrls) {
+            cleanDb[url] = db[url];
+          }
+          
+          self.postMessage(cleanDb);
+        };
+      `;
+
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(blob);
+      const worker = new Worker(workerUrl);
+
+      // Timeout handler
+      const timeoutId = setTimeout(() => {
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
+        reject(new Error('Worker timeout'));
+      }, CONFIG.WEB_WORKER.TIMEOUT);
+
+      worker.onmessage = (e) => {
+        clearTimeout(timeoutId);
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
+
+        if (CONFIG.DEBUG) {
+          console.log('🔧 Web Worker cleanup completed successfully');
+        }
+        resolve(e.data);
+      };
+
+      worker.onerror = (error) => {
+        clearTimeout(timeoutId);
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
+        reject(error);
+      };
+
+      // Send data to worker
+      worker.postMessage({ db, maxUrls });
+    });
   }
 
   function shortenNumber(num) {
@@ -442,23 +531,80 @@
     return getDB(); // Fallback to full load
   }
 
-  async function setDB(db) {
+  // Debounce state for setDB
+  let pendingDbWrite = null;
+  let debounceTimer = null;
+
+  // Internal function to actually write to storage
+  async function _persistDB(db) {
     try {
       // Auto cleanup if database is getting too large
       if (Object.keys(db).length > CONFIG.CLEANUP_THRESHOLD) {
         db = await cleanupOldUrls(db);
+        // Update cache with cleaned data
+        dbCache = db;
       }
 
-      // Update cache first
-      dbCache = db;
-      cacheValid = true;
-
-      // Then persist to storage
+      // Persist to storage
       GM_setValue('visitDB', db);
+
+      if (CONFIG.DEBUG) {
+        console.log('💾 Database persisted to storage');
+      }
     } catch (error) {
       console.warn('Failed to save visit database:', error);
       // Invalidate cache on save failure
       cacheValid = false;
+    }
+  }
+
+  // Debounced setDB - batches rapid writes
+  async function setDB(db) {
+    // Always update cache immediately for fast reads
+    dbCache = db;
+    cacheValid = true;
+
+    if (CONFIG.DEBOUNCE.ENABLED) {
+      // Store pending write
+      pendingDbWrite = db;
+
+      // Clear existing timer
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+
+      // Schedule debounced write
+      debounceTimer = setTimeout(async () => {
+        if (pendingDbWrite) {
+          const dataToWrite = pendingDbWrite;
+          pendingDbWrite = null;
+          debounceTimer = null;
+          await _persistDB(dataToWrite);
+        }
+      }, CONFIG.DEBOUNCE.DELAY);
+    } else {
+      // No debounce - write immediately
+      await _persistDB(db);
+    }
+  }
+
+  // Force flush pending writes (call before page unload)
+  function flushPendingWrites() {
+    if (pendingDbWrite) {
+      if (CONFIG.DEBUG) {
+        console.log('💾 Flushing pending database writes');
+      }
+      // Clear timer and write synchronously
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+      try {
+        GM_setValue('visitDB', pendingDbWrite);
+      } catch (error) {
+        console.warn('Failed to flush pending writes:', error);
+      }
+      pendingDbWrite = null;
     }
   }
 
@@ -991,52 +1137,65 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     startPolling();
   }
 
-  const tooltip = document.createElement('div');
-  // Apply styles using individual properties for better compatibility
-  Object.assign(tooltip.style, {
-    position: 'fixed',
-    padding: '6px 8px',
-    fontSize: '12px',
-    fontFamily: 'system-ui, sans-serif',
-    background: 'rgba(20, 20, 20, 0.9)',
-    color: 'white',
-    borderRadius: '6px',
-    pointerEvents: 'none',
-    whiteSpace: 'nowrap',
-    zIndex: '999999',
-    opacity: '0',
-    transition: 'opacity 0.15s ease'
-  });
+  // Lazy tooltip initialization - only create when first needed
+  let tooltip = null;
+  let tooltipInitialized = false;
 
-  // Safely append tooltip to DOM
-  function appendTooltipSafely() {
+  // Create and initialize tooltip element (called lazily on first hover)
+  function initializeTooltip() {
+    if (tooltipInitialized) return tooltip;
+
+    tooltip = document.createElement('div');
+    // Apply styles using individual properties for better compatibility
+    Object.assign(tooltip.style, {
+      position: 'fixed',
+      padding: '6px 8px',
+      fontSize: '12px',
+      fontFamily: 'system-ui, sans-serif',
+      background: 'rgba(20, 20, 20, 0.9)',
+      color: 'white',
+      borderRadius: '6px',
+      pointerEvents: 'none',
+      whiteSpace: 'nowrap',
+      zIndex: '999999',
+      opacity: '0',
+      transition: 'opacity 0.15s ease'
+    });
+
+    // Append to DOM
     if (document.body) {
       try {
         document.body.appendChild(tooltip);
-        return true;
+        tooltipInitialized = true;
+        if (CONFIG.DEBUG) {
+          console.log('📋 Tooltip initialized lazily on first hover');
+        }
       } catch (error) {
         console.warn('Failed to append tooltip to body:', error);
-        return false;
       }
     } else {
-      // Fallback for early DOM state
+      // Fallback for early DOM state (shouldn't happen with lazy init)
       document.addEventListener('DOMContentLoaded', () => {
         try {
           if (document.body && !document.body.contains(tooltip)) {
             document.body.appendChild(tooltip);
+            tooltipInitialized = true;
           }
         } catch (error) {
           console.warn('Failed to append tooltip on DOMContentLoaded:', error);
         }
       }, { passive: true, once: true });
-      return false;
     }
+
+    return tooltip;
   }
 
-  if (!appendTooltipSafely()) {
-    if (CONFIG.DEBUG) {
-      console.log('📋 Tooltip will be appended when DOM is ready');
+  // Get tooltip element, initializing if needed
+  function getTooltip() {
+    if (!tooltipInitialized) {
+      initializeTooltip();
     }
+    return tooltip;
   }
 
   let hoverTimer;
@@ -1055,16 +1214,20 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   };
 
   function showTooltip(e, linkUrl) {
+    // Initialize tooltip lazily on first use
+    const tip = getTooltip();
+    if (!tip) return; // Safety check
+
     const key = normalizeUrl(linkUrl);
     // Use cached DB for hot path performance - no storage I/O!
     const db = getDBCached();
     const data = db[key];
 
     // Clear previous content safely
-    tooltip.textContent = '';
+    tip.textContent = '';
 
     if (!data) {
-      tooltip.textContent = 'No visits recorded';
+      tip.textContent = 'No visits recorded';
     } else {
       // Create elements safely instead of using innerHTML
       const visitLine = document.createElement('div');
@@ -1075,13 +1238,13 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
       const lastVisit = data.visits?.[0] ? formatTimestamp(data.visits[0]) : 'Never';
       lastLine.textContent = `Last: ${lastVisit}`;
 
-      tooltip.appendChild(visitLine);
-      tooltip.appendChild(lastLine);
+      tip.appendChild(visitLine);
+      tip.appendChild(lastLine);
     }
 
     // Set initial position
     updateTooltipPosition(e.clientX, e.clientY);
-    tooltip.style.opacity = 1;
+    tip.style.opacity = 1;
 
     // Start auto-hide timer as safety net
     startAutoHideTimer();
@@ -1170,8 +1333,11 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     // Schedule position update for next frame
     rafId = requestAnimationFrame(() => {
       if (pendingTooltipPosition) {
-        tooltip.style.left = pendingTooltipPosition.x + 'px';
-        tooltip.style.top = pendingTooltipPosition.y + 'px';
+        const tip = getTooltip();
+        if (tip) {
+          tip.style.left = pendingTooltipPosition.x + 'px';
+          tip.style.top = pendingTooltipPosition.y + 'px';
+        }
         pendingTooltipPosition = null;
       }
       rafId = null;
@@ -1179,7 +1345,10 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   }
 
   function hideTooltip() {
-    tooltip.style.opacity = 0;
+    const tip = getTooltip();
+    if (tip) {
+      tip.style.opacity = 0;
+    }
     currentHoveredLink = null;
 
     // Cancel any pending animation frame
@@ -1366,12 +1535,17 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
   // Cleanup pending operations on page unload
   window.addEventListener('beforeunload', () => {
+    // Flush any pending debounced database writes
+    flushPendingWrites();
+
     if (pendingTimeout) {
       clearTimeout(pendingTimeout);
       // Process any pending URL change immediately before unload
       if (pendingUrlChange && pendingUrlChange !== currentUrl) {
         currentUrl = pendingUrlChange;
         updateVisit();
+        // Flush the new write as well
+        flushPendingWrites();
       }
     }
   });
