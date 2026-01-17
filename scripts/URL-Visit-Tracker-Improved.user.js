@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version      2.5.4
+// @version      2.5.5
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips. Advanced URL normalization and performance optimizations.
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -45,11 +45,11 @@
     // URL normalization options
     NORMALIZE_URL: {
       REMOVE_QUERY: false,          // Set to true to ignore query params (?key=value)
-                                    // false: tracks "site.com?q=A" and "site.com?q=B" separately
-                                    // true:  groups them as "site.com" (same page)
+      // false: tracks "site.com?q=A" and "site.com?q=B" separately
+      // true:  groups them as "site.com" (same page)
       REMOVE_HASH: true,            // Set to true to ignore hash fragments (#section)
-                                    // true:  treats "page.html#top" and "page.html#bottom" as same
-                                    // false: tracks different sections separately
+      // true:  treats "page.html#top" and "page.html#bottom" as same
+      // false: tracks different sections separately
       REMOVE_WWW: true,             // Set to true to remove www. prefix
       REMOVE_PROTOCOL: true,        // Set to true to remove http/https
       REMOVE_TRAILING_SLASH: true,  // Set to true to remove trailing /
@@ -92,10 +92,10 @@
       console.warn('Invalid URL provided to normalizeUrl:', url);
       return location.href;
     }
-    
+
     // Configurable URL normalization for flexible tracking granularity
     let normalized = url.trim();
-    
+
     // Handle malformed URLs
     try {
       // Test if URL is valid by creating URL object
@@ -106,50 +106,50 @@
       }
       return normalizeUrl(location.href);
     }
-    
+
     // Clean search URLs before other normalizations (must be done first)
     if (CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS) {
       normalized = cleanSearchUrl(normalized);
     }
-    
+
     // Remove protocol if configured
     if (CONFIG.NORMALIZE_URL.REMOVE_PROTOCOL) {
       normalized = normalized.replace(/^https?:\/\//, '');
     }
-    
+
     // Remove www prefix if configured
     if (CONFIG.NORMALIZE_URL.REMOVE_WWW) {
       normalized = normalized.replace(/^www\./, '');
     }
-    
+
     // Remove trailing slash if configured
     if (CONFIG.NORMALIZE_URL.REMOVE_TRAILING_SLASH) {
       normalized = normalized.replace(/\/$/, '');
     }
-    
+
     // Remove hash fragments if configured
     if (CONFIG.NORMALIZE_URL.REMOVE_HASH) {
       normalized = normalized.split('#')[0];
     }
-    
+
     // Remove query parameters if configured (after search cleaning)
     if (CONFIG.NORMALIZE_URL.REMOVE_QUERY) {
       normalized = normalized.split('?')[0];
     }
-    
+
     if (CONFIG.DEBUG) {
       console.log(`🔗 URL normalized: "${url}" → "${normalized}"`);
     }
-    
+
     return normalized;
   }
 
   // Check if URL should be skipped from tracking
   function shouldSkipUrl(url) {
     if (!CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES) return false;
-    
+
     const urlLower = url.toLowerCase();
-    
+
     // Check against skip patterns
     for (const pattern of CONFIG.URL_FILTERS.SKIP_PATTERNS) {
       if (urlLower.includes(pattern.toLowerCase())) {
@@ -159,20 +159,20 @@
         return true;
       }
     }
-    
+
     return false;
   }
 
   // Clean search engine URLs to group similar searches
   function cleanSearchUrl(url) {
     if (!CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS) return url;
-    
+
     try {
       const urlObj = new URL(url.startsWith('http') ? url : 'https://' + url);
       const hostname = urlObj.hostname.toLowerCase();
       const pathname = urlObj.pathname;
       const searchParams = new URLSearchParams(urlObj.search);
-      
+
       // Google Search
       if ((hostname.includes('google.') || hostname === 'google.com') && pathname.includes('/search')) {
         const query = searchParams.get('q');
@@ -185,7 +185,7 @@
           return cleanUrl;
         }
       }
-      
+
       // Bing Search
       else if (hostname.includes('bing.com') && pathname.includes('/search')) {
         const query = searchParams.get('q');
@@ -197,7 +197,7 @@
           return cleanUrl;
         }
       }
-      
+
       // DuckDuckGo Search
       else if (hostname.includes('duckduckgo.com')) {
         const query = searchParams.get('q');
@@ -209,7 +209,7 @@
           return cleanUrl;
         }
       }
-      
+
       // YouTube Search
       else if (hostname.includes('youtube.com') && pathname.includes('/results')) {
         const query = searchParams.get('search_query');
@@ -226,7 +226,7 @@
         console.warn('Failed to clean search URL:', error);
       }
     }
-    
+
     return url; // Return original if not a search URL or parsing failed
   }
 
@@ -234,12 +234,12 @@
   function safeClosest(target, selector) {
     // Handle null/undefined
     if (!target) return null;
-    
+
     // If target is a Text node, use its parent element
     if (target.nodeType === Node.TEXT_NODE) {
       target = target.parentElement;
     }
-    
+
     // If target doesn't have closest method (SVG elements in old browsers), fallback
     if (!target || typeof target.closest !== 'function') {
       // Traverse up manually
@@ -252,7 +252,7 @@
       }
       return null;
     }
-    
+
     // Use native closest if available
     return target.closest(selector);
   }
@@ -266,10 +266,10 @@
       }
       return;
     }
-    
+
     const currentHref = location.href;
     const now = Date.now();
-    
+
     // Check if we should process pending URL change
     if (pendingUrlChange && !pendingTimeout && (now - lastUrlChangeTime) >= URL_CHANGE_MIN_INTERVAL) {
       if (CONFIG.DEBUG) {
@@ -284,7 +284,7 @@
         updateVisit();
       }
     }
-    
+
     // Only process if URL actually changed and enough time has passed
     if (currentHref !== lastHref && (now - lastCheck) >= 1000) {
       if (CONFIG.DEBUG) {
@@ -298,10 +298,10 @@
       lastHref = currentHref;
     }
   }
-  
+
   function startPolling() {
     if (pollTimer) clearInterval(pollTimer);
-    
+
     // Adaptive polling interval based on activity
     let interval = CONFIG.POLL_INTERVAL;
     if (CONFIG.POLLING.ADAPTIVE) {
@@ -310,10 +310,10 @@
       // Decay activity count over time
       activityCount = Math.max(0, activityCount - 1);
     }
-    
+
     pollTimer = setInterval(directPoll, interval);
   }
-  
+
   function stopPolling() {
     if (pollTimer) {
       clearInterval(pollTimer);
@@ -347,7 +347,8 @@
   }
 
   // Smart cleanup to maintain database size with performance optimization
-  function cleanupOldUrls(db) {
+  // Always returns a Promise for consistent async handling
+  async function cleanupOldUrls(db) {
     const urls = Object.keys(db);
     if (urls.length <= CONFIG.MAX_URLS_STORED) return db;
 
@@ -355,7 +356,7 @@
       console.log(`🧹 Large database cleanup: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
     }
 
-    // Use requestIdleCallback for non-blocking cleanup if available
+    // Cleanup logic extracted for reuse
     const performCleanup = () => {
       // Calculate score for each URL (visits * recency)
       const scored = urls.map(url => {
@@ -380,7 +381,7 @@
       return cleanDb;
     };
 
-    // Use requestIdleCallback for non-blocking cleanup if available
+    // Use requestIdleCallback for non-blocking cleanup on large databases
     if (window.requestIdleCallback && urls.length > 5000) {
       return new Promise(resolve => {
         requestIdleCallback(() => {
@@ -397,10 +398,10 @@
     if (!Number.isFinite(num)) return '0'; // Handle NaN, Infinity, -Infinity
     if (num < 0) return '0'; // Visits can't be negative
     if (num === 0) return '0';
-    
+
     // Convert to absolute value and round to avoid floating point issues
     const absNum = Math.abs(Math.floor(num));
-    
+
     // Handle very large numbers with appropriate suffixes
     if (absNum >= 1_000_000_000) {
       return (Math.round(absNum / 100_000_000) / 10) + 'B'; // Billions
@@ -411,7 +412,7 @@
     if (absNum >= 1_000) {
       return (Math.round(absNum / 100) / 10) + 'K'; // Thousands
     }
-    
+
     return String(absNum);
   }
 
@@ -420,7 +421,7 @@
     if (cacheValid && dbCache !== null) {
       return dbCache;
     }
-    
+
     try {
       dbCache = GM_getValue('visitDB', {});
       cacheValid = true;
@@ -441,17 +442,17 @@
     return getDB(); // Fallback to full load
   }
 
-  function setDB(db) {
+  async function setDB(db) {
     try {
       // Auto cleanup if database is getting too large
       if (Object.keys(db).length > CONFIG.CLEANUP_THRESHOLD) {
-        db = cleanupOldUrls(db);
+        db = await cleanupOldUrls(db);
       }
-      
+
       // Update cache first
       dbCache = db;
       cacheValid = true;
-      
+
       // Then persist to storage
       GM_setValue('visitDB', db);
     } catch (error) {
@@ -470,7 +471,9 @@
     setTimeout(() => {
       dbCache = null;
     }, 0);
-  }  let currentUrl = normalizeUrl(location.href);
+  }
+
+  let currentUrl = normalizeUrl(location.href);
 
   function updateVisit() {
     // Skip tracking if current URL matches filter patterns
@@ -480,7 +483,7 @@
       }
       return;
     }
-    
+
     const db = getDB();
     const now = new Date();
     const timestamp = createTimestamp(now);
@@ -811,7 +814,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   function onUrlChange() {
     const newUrl = normalizeUrl(location.href);
     if (newUrl === currentUrl) return;
-    
+
     // Skip tracking if URL matches filter patterns
     if (shouldSkipUrl(location.href)) {
       if (CONFIG.DEBUG) {
@@ -819,28 +822,28 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
       }
       return;
     }
-    
+
     // Increment activity counter for adaptive polling
     if (CONFIG.POLLING.ADAPTIVE) {
       activityCount = Math.min(10, activityCount + 2); // Cap at 10, add 2 for URL change
     }
-    
+
     const now = Date.now();
     const timeSinceLastChange = now - lastUrlChangeTime;
-    
+
     if (timeSinceLastChange < URL_CHANGE_MIN_INTERVAL) {
       if (CONFIG.DEBUG) {
         console.log(`⏰ URL change rate limited, scheduling: ${currentUrl} → ${newUrl}`);
       }
-      
+
       // Store the pending change without updating currentUrl yet
       pendingUrlChange = newUrl;
-      
+
       // Clear any existing pending timeout
       if (pendingTimeout) {
         clearTimeout(pendingTimeout);
       }
-      
+
       // Schedule the change for when rate limit expires
       const remainingTime = URL_CHANGE_MIN_INTERVAL - timeSinceLastChange;
       pendingTimeout = setTimeout(() => {
@@ -851,14 +854,14 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
           const savedPendingUrl = pendingUrlChange;
           pendingUrlChange = null;
           pendingTimeout = null;
-          
+
           // Process the pending change
           currentUrl = savedPendingUrl;
           lastUrlChangeTime = Date.now();
           updateVisit();
         }
       }, remainingTime + 10); // +10ms buffer
-      
+
       return;
     }
 
@@ -882,20 +885,20 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     // Enhanced history hooks with rate limiting
     const _pushState = history.pushState;
     const _replaceState = history.replaceState;
-    
+
     history.pushState = function (...args) {
       const result = _pushState.apply(this, args);
       // Use setTimeout to avoid immediate execution conflicts
       setTimeout(onUrlChange, 50);
       return result;
     };
-    
+
     history.replaceState = function (...args) {
       const result = _replaceState.apply(this, args);
       setTimeout(onUrlChange, 50);
       return result;
     };
-    
+
     // Standard event listeners
     window.addEventListener('popstate', onUrlChange);
     window.addEventListener('hashchange', onUrlChange);
@@ -905,22 +908,22 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     const mo = new MutationObserver((mutations) => {
       // Throttle mutation processing to avoid spam
       if (mutationTimeout) return;
-      
+
       mutationTimeout = setTimeout(() => {
         mutationTimeout = null;
         let titleChanged = false;
-        
+
         for (const mutation of mutations) {
           // Only check mutations that could affect title
           if (mutation.type === 'childList') {
             // Case 1: Title element added/removed from head
-            const titleInAdded = Array.from(mutation.addedNodes).some(node => 
+            const titleInAdded = Array.from(mutation.addedNodes).some(node =>
               node.nodeName === 'TITLE'
             );
-            const titleInRemoved = Array.from(mutation.removedNodes).some(node => 
+            const titleInRemoved = Array.from(mutation.removedNodes).some(node =>
               node.nodeName === 'TITLE'
             );
-            
+
             // Case 2: Direct title element changes
             if (mutation.target.nodeName === 'TITLE') {
               titleChanged = true;
@@ -929,7 +932,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
               }
               break;
             }
-            
+
             if (titleInAdded || titleInRemoved) {
               titleChanged = true;
               if (CONFIG.DEBUG) {
@@ -937,11 +940,11 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
               }
               break;
             }
-          } 
-          
+          }
+
           // Case 3: Character data changed in title's text nodes (more targeted)
-          else if (mutation.type === 'characterData' && 
-                   mutation.target.parentNode?.nodeName === 'TITLE') {
+          else if (mutation.type === 'characterData' &&
+            mutation.target.parentNode?.nodeName === 'TITLE') {
             titleChanged = true;
             if (CONFIG.DEBUG) {
               console.log('📝 Title characterData mutation detected:', mutation);
@@ -949,7 +952,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
             break;
           }
         }
-        
+
         if (titleChanged) {
           if (CONFIG.DEBUG) {
             console.log('📝 Title change detected, triggering URL change check');
@@ -961,12 +964,12 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     // Safely observe document.head with focused title tracking
     if (document.head) {
-      mo.observe(document.head, { 
+      mo.observe(document.head, {
         childList: true,      // Detect title element addition/removal
         subtree: false,       // Only direct children for better performance
         characterData: false  // Handle characterData separately for title only
       });
-      
+
       // Separate observer for title content changes
       const titleEl = document.querySelector('title');
       if (titleEl) {
@@ -978,8 +981,8 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
       }
     } else {
       // Fallback: observe document for head creation (minimal scope)
-      mo.observe(document, { 
-        childList: true, 
+      mo.observe(document, {
+        childList: true,
         subtree: false
       });
     }
@@ -1121,13 +1124,13 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     // Prevent duplicate listeners for same link
     if (currentHoveredLink === a) return;
-    
+
     // Clean up previous link if any
     if (currentHoveredLink) {
       clearTimeout(hoverTimer);
       hideTooltip();
     }
-    
+
     currentHoveredLink = a;
 
     clearTimeout(hoverTimer);
@@ -1139,7 +1142,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   document.addEventListener('mouseout', e => {
     const a = safeClosest(e.target, 'a[href]');
     if (!a || a !== currentHoveredLink) return;
-    
+
     // Check if we're moving to a child element of the same link
     const relatedTarget = e.relatedTarget;
     if (relatedTarget && a.contains(relatedTarget)) {
@@ -1148,7 +1151,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
       }
       return; // Still within the same link, don't hide tooltip
     }
-    
+
     // Also check if we're moving from child to parent within same link
     const relatedLink = safeClosest(relatedTarget, 'a[href]');
     if (relatedLink === a) {
@@ -1207,7 +1210,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     // Don't register menu for initial empty state - let updateVisit() handle it
     updateVisit();
     installUrlObservers();
-    
+
     // Handle polling optimization and cache invalidation for multi-tab scenarios
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
