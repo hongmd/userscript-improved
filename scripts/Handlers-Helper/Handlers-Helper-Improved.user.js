@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Handlers Helper (Improved)
 // @namespace   Violentmonkey Scripts
-// @version     4.9.2
+// @version     4.9.3
 // @description Helper for protocol_hook.lua - Enhanced drag-to-action system for media links with MPV integration. Supports multiple protocols (mpv://, streamlink, yt-dlp) and customizable actions.
 // @author      hongmd (improved)
 // @license     MIT
@@ -46,12 +46,13 @@ const Constants = (() => {
 
     const GUIDE = 'Value: pipe ytdl stream mpv iptv';
 
-    const ACTION_EXPLANATIONS = {
-        pipe: '📺 pipe (UP) → mpv://mpvy/ → Pipe video to MPV with yt-dlp processing',
-        ytdl: '📥 ytdl (DOWN) → mpv://ytdl/ → Download video using yt-dlp',
-        stream: '🌊 stream (LEFT) → mpv://stream/ → Stream video using streamlink',
-        mpv: '▶️ mpv (RIGHT) → mpv://play/ → Direct play in MPV player',
-        iptv: '📋 iptv → mpv://list/ → Add to IPTV playlist'
+    const ACTION_REGISTRY = {
+        pipe: { app: 'mpvy', emoji: '📺', label: 'Pipe to MPV with yt-dlp', hint: 'YouTube, complex streams' },
+        ytdl: { app: 'ytdl', emoji: '📥', label: 'Download with yt-dlp', hint: 'Saving videos locally' },
+        stream: { app: 'stream', emoji: '🌊', label: 'Stream via streamlink', hint: 'Twitch, live streams' },
+        mpv: { app: 'play', emoji: '▶️', label: 'Direct play in MPV', hint: 'Direct video files' },
+        vid: { app: 'play', emoji: '▶️', label: 'Direct play in MPV', hint: 'Direct video files' },
+        iptv: { app: 'list', emoji: '📋', label: 'Add to IPTV playlist', hint: 'Building playlists' },
     };
 
     const LIVE_WINDOW_WIDTH = 400;
@@ -85,7 +86,7 @@ const Constants = (() => {
 
     return {
         GUIDE,
-        ACTION_EXPLANATIONS,
+        ACTION_REGISTRY,
         LIVE_WINDOW_WIDTH,
         LIVE_WINDOW_HEIGHT,
         DRAG_THRESHOLD,
@@ -347,24 +348,9 @@ const Actions = (() => {
             urlString = finalUrl;
         }
 
-        // Determine app type and protocol action
-        switch (actionType) {
-            case 'pipe':
-                app = 'mpvy'; // Pipe video stream to MPV with yt-dlp preprocessing
-                break;
-            case 'iptv':
-                app = 'list'; // Add to IPTV playlist
-                break;
-            case 'stream':
-                app = 'stream'; // Stream using streamlink
-                break;
-            case 'mpv':
-            case 'vid':
-                app = 'play'; // Direct play in MPV
-                break;
-            default:
-                app = actionType; // Pass through custom actions
-        }
+        // Determine app type from registry (falls back to actionType for custom actions)
+        const actionDef = Constants.ACTION_REGISTRY[actionType];
+        app = actionDef ? actionDef.app : actionType;
 
         // Build final URL
         const encodedUrl = Utils.encodeUrl(urlString);
@@ -616,28 +602,28 @@ const Drag = (() => {
 const Menu = (() => {
     'use strict';
 
+    const DIRECTION_ARROWS = { UP: '↑', DOWN: '↓', LEFT: '←', RIGHT: '→' };
+
     const showActionHelp = () => {
+        const reg = Constants.ACTION_REGISTRY;
+
+        // Build direction sections from registry
+        const directionLines = ['UP', 'DOWN', 'LEFT', 'RIGHT'].map(dir => {
+            const action = State.settings[dir];
+            const def = reg[action] || { emoji: '🔧', label: action, hint: 'Custom action' };
+            const extra = dir === 'DOWN' && State.settings.down_confirm ? ' (Confirm: ON)' : '';
+            return `${def.emoji} ${dir} (${DIRECTION_ARROWS[dir]}): ${action}${extra}\n   → ${def.label}\n   → Good for: ${def.hint}`;
+        }).join('\n\n');
+
+        const listDef = reg.iptv || { emoji: '📋', label: 'Add to IPTV playlist', hint: 'Building playlists' };
+
         const helpText = `🎮 DRAG DIRECTIONS & ACTIONS:
 
-📺 UP (↑): ${State.settings.UP}
-   → Pipes video to MPV with yt-dlp processing
-   → Good for: YouTube, complex streams
+${directionLines}
 
-📥 DOWN (↓): ${State.settings.DOWN} ${State.settings.down_confirm ? '(Confirm: ON)' : '(Confirm: OFF)'}
-   → Downloads video using yt-dlp
-   → Good for: Saving videos locally
-
-🌊 LEFT (←): ${State.settings.LEFT}
-   → Streams video using streamlink
-   → Good for: Twitch, live streams
-
-▶️ RIGHT (→): ${State.settings.RIGHT}
-   → Direct play in MPV player
-   → Good for: Direct video files
-
-📋 UP-LEFT (↖): list
-   → Adds to IPTV/playlist
-   → Good for: Building playlists
+${listDef.emoji} UP-LEFT (↖): list
+   → ${listDef.label}
+   → Good for: ${listDef.hint}
 
 🎯 USAGE:
 1. Hover over a video link
@@ -677,36 +663,22 @@ const Menu = (() => {
         GM_registerMenuCommand('❓ Show Action Help', showActionHelp);
         GM_registerMenuCommand('🧪 Test Directions', testDirections);
 
-        GM_registerMenuCommand(`📺 UP: ${State.settings.UP}`, function () {
-            const value = Utils.safePrompt(Constants.GUIDE + '\n\n↑ UP Action (pipe = stream to MPV with yt-dlp)', State.settings.UP);
-            if (value) {
-                State.updateSetting('UP', value);
-                Utils.reloadPage();
-            }
-        });
+        // Data-driven direction menu commands from registry
+        ['UP', 'DOWN', 'LEFT', 'RIGHT'].forEach(dir => {
+            const action = State.settings[dir];
+            const def = Constants.ACTION_REGISTRY[action] || { emoji: '🔧', label: action };
+            const arrow = DIRECTION_ARROWS[dir];
 
-        GM_registerMenuCommand(`📥 DOWN: ${State.settings.DOWN}`, function () {
-            const value = Utils.safePrompt(Constants.GUIDE + '\n\n↓ DOWN Action (ytdl = download with yt-dlp)', State.settings.DOWN);
-            if (value) {
-                State.updateSetting('DOWN', value);
-                Utils.reloadPage();
-            }
-        });
-
-        GM_registerMenuCommand(`🌊 LEFT: ${State.settings.LEFT}`, function () {
-            const value = Utils.safePrompt(Constants.GUIDE + '\n\n← LEFT Action (stream = use streamlink)', State.settings.LEFT);
-            if (value) {
-                State.updateSetting('LEFT', value);
-                Utils.reloadPage();
-            }
-        });
-
-        GM_registerMenuCommand(`▶️ RIGHT: ${State.settings.RIGHT}`, function () {
-            const value = Utils.safePrompt(Constants.GUIDE + '\n\n→ RIGHT Action (mpv = direct play)', State.settings.RIGHT);
-            if (value) {
-                State.updateSetting('RIGHT', value);
-                Utils.reloadPage();
-            }
+            GM_registerMenuCommand(`${def.emoji} ${dir}: ${action}`, function () {
+                const value = Utils.safePrompt(
+                    Constants.GUIDE + `\n\n${arrow} ${dir} Action (${action} = ${def.label})`,
+                    action
+                );
+                if (value) {
+                    State.updateSetting(dir, value);
+                    Utils.reloadPage();
+                }
+            });
         });
 
         GM_registerMenuCommand('HLS Domains', function () {

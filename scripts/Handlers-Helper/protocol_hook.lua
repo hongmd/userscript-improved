@@ -4,7 +4,7 @@
 
 local utils = require 'mp.utils'
 local msg = require 'mp.msg'
-local opts = require "mp.options"
+local opts = require 'mp.options'
 
 local options = {
     cwd = '',
@@ -22,15 +22,15 @@ local cwd = options.cwd
 --Beta feature, Windows only (for now), true = on, false = off. check -- named pipe
 local ipcMode = options.ipcMode
 local proxy = options.proxy
-print(proxy)
+msg.debug(proxy)
 if proxy == '' then
     proxy = false
 end
-print(proxy)
+msg.debug(proxy)
 local nogeometry = options.nogeometry
 local stream_quality = options.stream_quality
 
-print(cwd)
+msg.debug(cwd)
 
 local function getOS()
     local BinaryFormat = package.cpath
@@ -51,49 +51,18 @@ end
 local function exedir()
     --local path1 = debug.getinfo(1).source
     local path = mp.command_native({ 'expand-path', '~~home/' })
-    print(path)
+    msg.debug(path)
     path = path:gsub('/portable_config.*', '')
-    print(path)
+    msg.debug(path)
     return path
 end
 
 local osv = getOS()
 if cwd == '' then
     cwd = exedir()
-    print(cwd)
+    msg.debug(cwd)
 end
 
---[[function getOS(cmd, raw)
-  local f = assert(io.popen(cmd, 'r'))
-  local s = assert(f:read('*a'))
-  f:close()
-  if raw then return s end
-  s = string.gsub(s, '^%s+', '')
-  s = string.gsub(s, '%s+$', '')
-  s = string.gsub(s, '[\n\r]+', ' ')
-  return s
-end
-
-function getOS()
-	-- ask LuaJIT first
-	if jit then
-		return jit.os
-	end
-
-	-- Unix, Linux variants
-	local fh,err = assert(io.popen("uname -o 2>/dev/null","r"))
-	if fh then
-		osname = fh:read()
-	end
-
-	return osname or "Windows"
-end
-
-print(getOS())]] --
-
-
-
---print(getOS())
 
 local function parseqs(url)
     -- return 0-based index to use with --playlist-start
@@ -192,7 +161,7 @@ local function replace(str, this, that)
 end
 
 local function exec(args)
-    print("Running: " .. table.concat(args, " "))
+    msg.info("Running: " .. table.concat(args, " "))
 
     return mp.command_native({
         name = "subprocess",
@@ -210,7 +179,7 @@ local function escapeqs(s)
     return string.gsub(s, '&', '^&')
 end
 
-function magiclines(s)
+local function magiclines(s)
     if s:sub(-1) ~= "\n" then s = s .. "\n" end
     return s:gmatch("(.-)\n")
 end
@@ -220,7 +189,7 @@ local function getDomain(url)
 end
 
 local function livestreamer(url, referer, proxy, hls)
-    print('Streamlink: ' .. url)
+    msg.info('Streamlink: ' .. url)
     local url2 = '"' .. url .. '"'
     local cmd = ''
     local cmd2 = url2 .. ' ' .. stream_quality .. ' '
@@ -238,20 +207,20 @@ local function livestreamer(url, referer, proxy, hls)
     if proxy ~= false then
         cmd2 = cmd2 .. '--http-proxy=' .. proxy .. '/'
     end
-    print(referer)
+    msg.debug(referer)
 
     cmd = cmd .. cmd2 .. cmdconfig
     if referer ~= '' then
         cmd = cmd .. ' --http-header=Referer=' .. referer
     end
-    print(cmd)
+    msg.debug(cmd)
     mp.command(cmd)
     --mp.command('quit')
 end
 
 -- Thank to pTalent: https://voz.vn/t/tong-hop-nhung-addon-chat-cho-firefox-pc-mobile.682181/post-27975348
 local function iptv(url, referer, proxy, hls)
-    print('IPTV: ' .. url)
+    msg.info('IPTV: ' .. url)
     local url2 = '"' .. url .. '"'
     local playlist = false
     --if (url:find("hls://") == 1) then
@@ -267,12 +236,12 @@ local function iptv(url, referer, proxy, hls)
     local stdout = ''
     local stdfin = ''
     local domain = getDomain(url)
-    print(domain)
-    print(dump(split(url, '/')))
+    msg.debug(domain)
+    msg.debug(dump(split(url, '/')))
     if osv == 'Windows' then
-        curlpath = cwd .. '/curl.exe '
+        curlpath = cwd .. '/curl.exe'
     else
-        curlpath = 'curl '
+        curlpath = 'curl'
     end
     if osv == 'Windows' then
         mpvpath = 'run ' .. cwd .. '/mpv.exe '
@@ -281,7 +250,7 @@ local function iptv(url, referer, proxy, hls)
     end
 
     local args = { curlpath, url, "-L", '-s' }
-    print(dump(args))
+    msg.debug(dump(args))
     local p = mp.command_native {
         name = "subprocess",
         capture_stdout = true,
@@ -297,8 +266,12 @@ local function iptv(url, referer, proxy, hls)
             end
         end
         --stdout = string.gsub(stdout, '/hls/', 'https://'..domain..'/hls/')
-        print(stdout)
-        f = io.open(cwd .. '/dummy.m3u8', 'w')
+        msg.debug(stdout)
+        local f = io.open(cwd .. '/dummy.m3u8', 'w')
+        if not f then
+            msg.error('Failed to open ' .. cwd .. '/dummy.m3u8 for writing')
+            return
+        end
         f:write(stdout)
         f:close()
 
@@ -321,7 +294,7 @@ local function iptv(url, referer, proxy, hls)
 end
 
 local function mpv(url, referer, proxy, command)
-    print('MPV: ' .. url)
+    msg.info('MPV: ' .. url)
     local url2 = '"' .. url .. '"'
     local cmd = ''
     if osv == 'Windows' then
@@ -344,7 +317,7 @@ local function mpv(url, referer, proxy, command)
 end
 
 local function EA(url, referer, app)
-    print('EA: ' .. url)
+    msg.info('EA: ' .. url)
     local url2 = '"' .. url .. '"'
     local cmd = 'run ' .. app .. ' ' .. url2
     mp.command(cmd)
@@ -352,7 +325,7 @@ local function EA(url, referer, app)
 end
 
 local function ytdl(url, referer, mode)
-    print('YTDL: ' .. url)
+    msg.info('YTDL: ' .. url)
     local url2 = '"' .. url .. '"'
     local cmd = ''
     local cmd2 = ''
@@ -378,7 +351,7 @@ end
 
 local function gallery(url, referer)
     local es, urls, result = exec2({ "gallery-dl", "-g", url })
-    print(urls)
+    msg.debug(urls)
     if (es < 0) or (urls == nil) or (urls == "") then
         msg.error("failed to get album list.")
     end
@@ -394,8 +367,8 @@ end
 
 local function piper(url, mode, proxy, hls)
     --yt-dlp -o - https://www.douyu.com/5092355
-    print(proxy)
-    local url = escapeqs(url)
+    msg.debug(proxy)
+    local escaped_url = escapeqs(url)
     local playlist = false
     --if (url:find("hls://") == 1) then
     if (hls == true) then
@@ -440,32 +413,23 @@ local function piper(url, mode, proxy, hls)
         ytdlcmd = ytdlcmd .. ' ' .. quality
     end
     if osv == 'Windows' then
-        cmd = 'run cmd /c cd /d ' .. cwd .. ' && yt-dlp.exe ' .. ytdlcmd .. ' -o - ' .. url .. ' | mpv.exe -' .. mpvcmd
+        cmd = 'run cmd /c cd /d ' .. cwd .. ' && yt-dlp.exe ' .. ytdlcmd .. ' -o - ' .. escaped_url .. ' | mpv.exe -' .. mpvcmd
     else
-        cmd = 'run yt-dlp ' .. ytdlcmd .. ' -o - ' .. url .. ' | mpv -' .. mpvcmd
+        cmd = 'run yt-dlp ' .. ytdlcmd .. ' -o - ' .. escaped_url .. ' | mpv -' .. mpvcmd
     end
-    print(cmd)
-    print(cwd)
+    msg.debug(cmd)
+    msg.debug(cwd)
     mp.command(cmd)
 end
 
---print(dump(mp))
---print(mp.find_config_file('.'))
---print(utils.join_path(mp.find_config_file('.'),"streamlink"))
---print(dump(debug.getinfo(1)))
---print(debug.getinfo(1).source)
---current_dir=io.popen"cd":read'*l'
---print(current_dir)
---print(package.path)
---print(package.cpath)
---print(os.getenv('PATH'))
-print(dump(options))
+
+msg.debug(dump(options))
 
 
 
 if ipcMode == true then
-    local ipc = mp.get_property("input-ipc-server", "")
-    if ipc ~= "" then
+    local ipc_server = mp.get_property("input-ipc-server", "")
+    if ipc_server ~= "" then
         ipcMode = false
     end
 end
@@ -488,7 +452,7 @@ mp.add_hook("on_load", 1, function()
         url = 'mpv://' .. url
     end
     if (url:find("mpv://") ~= 1) then
-        print("not a mpv url: " .. url)
+        msg.debug("not a mpv url: " .. url)
         return
     end
     --mp.set_property("stream-open-filename", "memory://")
@@ -519,7 +483,7 @@ mp.add_hook("on_load", 1, function()
         if qs['referer'] then
             referer = qs['referer']
             referer = atobUrl(referer)
-            print(referer)
+            msg.debug(referer)
         end
         if qs['autopip'] then
             autopip = true
