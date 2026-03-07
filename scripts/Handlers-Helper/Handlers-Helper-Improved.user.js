@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Handlers Helper (Improved)
 // @namespace   Violentmonkey Scripts
-// @version     4.9.1
+// @version     4.9.2
 // @description Helper for protocol_hook.lua - Enhanced drag-to-action system for media links with MPV integration. Supports multiple protocols (mpv://, streamlink, yt-dlp) and customizable actions.
 // @author      hongmd (improved)
 // @license     MIT
@@ -13,6 +13,8 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
+// @downloadURL https://raw.githubusercontent.com/hongmd/userscript-improved/main/scripts/Handlers-Helper/Handlers-Helper-Improved.user.js
+// @updateURL   https://raw.githubusercontent.com/hongmd/userscript-improved/main/scripts/Handlers-Helper/Handlers-Helper-Improved.user.js
 // @run-at      document-start
 // @noframes
 // ==/UserScript==
@@ -129,12 +131,8 @@ const Utils = (() => {
     };
 
     const debugError = (...args) => {
-        if (typeof State !== 'undefined' && State.settings && State.settings.debug) {
-            console.error(...args);
-        } else {
-            // Always log errors even if debug is off
-            console.error(...args);
-        }
+        // Always log errors regardless of debug setting
+        console.error(...args);
     };
 
     const getParentByTagName = (element, tagName) => {
@@ -197,7 +195,7 @@ const State = (() => {
             debug: GM_getValue('debug', Constants.DEFAULTS.debug)
         };
 
-        hlsdomainArray = settings.hlsdomain.split(',').filter(d => d.trim());
+        hlsdomainArray = settings.hlsdomain.split(',').map(d => d.trim()).filter(Boolean);
 
         // Add CSS class for collected links styling
         GM_addStyle(`
@@ -554,7 +552,7 @@ const Drag = (() => {
                     event.preventDefault();
                     return;
                 }
-            }, { passive: true });
+            });
 
             document.addEventListener('dragend', function (event) {
                 if (!dragState) return;
@@ -715,7 +713,7 @@ const Menu = (() => {
             const value = Utils.safePrompt('Example: 1.com,2.com,3.com,4.com', State.settings.hlsdomain);
             if (value !== null) {
                 State.updateSetting('hlsdomain', value);
-                State.hlsdomainArray = value.split(',').filter(d => d.trim());
+                State.hlsdomainArray = value.split(',').map(d => d.trim()).filter(Boolean);
             }
         });
 
@@ -790,7 +788,6 @@ const Collection = (() => {
             // Cleanup listeners
             const handleMouseUp = function () {
                 mouseIsDown = false;
-                document.removeEventListener('mouseup', handleMouseUp);
             };
 
             const handleContextMenu = function (contextEvent) {
@@ -798,7 +795,6 @@ const Collection = (() => {
                     contextEvent.preventDefault();
                     isHeld = false;
                 }
-                document.removeEventListener('contextmenu', handleContextMenu);
             };
 
             document.addEventListener('mouseup', handleMouseUp, { once: true });
