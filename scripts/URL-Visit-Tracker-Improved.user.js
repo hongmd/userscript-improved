@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version      2.7.0
+// @version      2.8.0
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips. Advanced URL normalization and performance optimizations.
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -21,53 +21,73 @@
 (function () {
   'use strict';
 
+  const DEFAULT_SETTINGS = Object.freeze({
+    badgeVisible: true,
+    debugMode: false,
+    hoverDelay: 1000,
+    removeQuery: false,
+    removeHash: true,
+    cleanSearchUrls: true,
+    skipUtilityPages: true,
+    debounceEnabled: true,
+    debounceDelay: 1000,
+    webWorkerEnabled: true,
+    pauseWhenHidden: true,
+    adaptivePolling: true,
+    pollInterval: 5000,
+    maxUrlsStored: 10000,
+    maxVisitsStored: 20
+  });
+
+  const NUMERIC_SETTING_LIMITS = Object.freeze({
+    hoverDelay: { min: 0, max: 5000, defaultValue: DEFAULT_SETTINGS.hoverDelay },
+    debounceDelay: { min: 100, max: 5000, defaultValue: DEFAULT_SETTINGS.debounceDelay },
+    pollInterval: { min: 1000, max: 30000, defaultValue: DEFAULT_SETTINGS.pollInterval },
+    maxUrlsStored: { min: 1000, max: 50000, defaultValue: DEFAULT_SETTINGS.maxUrlsStored },
+    maxVisitsStored: { min: 5, max: 100, defaultValue: DEFAULT_SETTINGS.maxVisitsStored }
+  });
+
   // Configuration options
   const CONFIG = {
-    MAX_VISITS_STORED: 20,
-    MAX_URLS_STORED: 10000,         // Massive capacity for extensive tracking
-    CLEANUP_THRESHOLD: 12000,       // Cleanup when exceeding this (20% buffer)
-    HOVER_DELAY: 1000,              // Delay before showing tooltip (ms)
-    POLL_INTERVAL: 5000,            // Reduced polling frequency for better performance
+    MAX_VISITS_STORED: DEFAULT_SETTINGS.maxVisitsStored,
+    MAX_URLS_STORED: DEFAULT_SETTINGS.maxUrlsStored, // Massive capacity for extensive tracking
+    HOVER_DELAY: DEFAULT_SETTINGS.hoverDelay,        // Delay before showing tooltip (ms)
+    POLL_INTERVAL: DEFAULT_SETTINGS.pollInterval,    // Reduced polling frequency for better performance
     BADGE_POSITION: { right: '14px', bottom: '14px' },
-    BADGE_VISIBLE: true,
-    DEBUG: false,                   // Set to true to enable debug logging
+    BADGE_VISIBLE: DEFAULT_SETTINGS.badgeVisible,
+    DEBUG: DEFAULT_SETTINGS.debugMode, // Set to true to enable debug logging
     // Performance optimizations
     POLLING: {
-      PAUSE_WHEN_HIDDEN: true,      // Pause polling timer when tab is hidden
-      SKIP_WHEN_HIDDEN: true,       // Skip polling execution when tab is hidden (lighter)
-      ADAPTIVE: true                // Enable adaptive polling based on activity
-    },
-    // Multi-tab coordination
-    MULTI_TAB: {
-      ENABLED: false,               // Set to true to enable multi-tab cache coordination
-      SYNC_INTERVAL: 10000          // How often to sync cache across tabs (ms)
+      PAUSE_WHEN_HIDDEN: DEFAULT_SETTINGS.pauseWhenHidden, // Pause polling timer when tab is hidden
+      SKIP_WHEN_HIDDEN: true,                               // Skip polling execution when tab is hidden (lighter)
+      ADAPTIVE: DEFAULT_SETTINGS.adaptivePolling            // Enable adaptive polling based on activity
     },
     // Debounce settings for database writes
     DEBOUNCE: {
-      ENABLED: true,                // Enable debounced writes for better performance
-      DELAY: 1000                   // Delay in ms before writing to storage
+      ENABLED: DEFAULT_SETTINGS.debounceEnabled, // Enable debounced writes for better performance
+      DELAY: DEFAULT_SETTINGS.debounceDelay      // Delay in ms before writing to storage
     },
     // Web Worker for heavy operations
     WEB_WORKER: {
-      ENABLED: true,                // Use Web Worker for cleanup operations
+      ENABLED: DEFAULT_SETTINGS.webWorkerEnabled, // Use Web Worker for cleanup operations
       TIMEOUT: 15000                // Timeout for worker operations (ms)
     },
     // URL normalization options
     NORMALIZE_URL: {
-      REMOVE_QUERY: false,          // Set to true to ignore query params (?key=value)
+      REMOVE_QUERY: DEFAULT_SETTINGS.removeQuery, // Set to true to ignore query params (?key=value)
       // false: tracks "site.com?q=A" and "site.com?q=B" separately
       // true:  groups them as "site.com" (same page)
-      REMOVE_HASH: true,            // Set to true to ignore hash fragments (#section)
+      REMOVE_HASH: DEFAULT_SETTINGS.removeHash, // Set to true to ignore hash fragments (#section)
       // true:  treats "page.html#top" and "page.html#bottom" as same
       // false: tracks different sections separately
       REMOVE_WWW: true,             // Set to true to remove www. prefix
       REMOVE_PROTOCOL: true,        // Set to true to remove http/https
       REMOVE_TRAILING_SLASH: true,  // Set to true to remove trailing /
-      CLEAN_SEARCH_URLS: true       // Clean search engine URLs (keep only main query)
+      CLEAN_SEARCH_URLS: DEFAULT_SETTINGS.cleanSearchUrls // Clean search engine URLs (keep only main query)
     },
     // URL filtering - Skip tracking certain types of URLs
     URL_FILTERS: {
-      SKIP_UTILITY_PAGES: true,     // Skip tracking utility/internal pages (cookies, auth, etc.)
+      SKIP_UTILITY_PAGES: DEFAULT_SETTINGS.skipUtilityPages, // Skip tracking utility/internal pages (cookies, auth, etc.)
       SKIP_PATTERNS: [              // URL patterns to skip (case-insensitive)
         '/RotateCookiesPage',       // YouTube cookie rotation
         '/ServiceLogin',            // Google login pages
@@ -95,6 +115,96 @@
   // In-memory cache for hot path performance
   let dbCache = null;
   let cacheValid = false;
+
+  function sanitizeNumericSetting(name, value) {
+    const rule = NUMERIC_SETTING_LIMITS[name];
+    if (!rule) {
+      return value;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return rule.defaultValue;
+    }
+
+    return Math.min(rule.max, Math.max(rule.min, parsed));
+  }
+
+  function buildValidatedSettings(rawSettings = {}) {
+    return {
+      badgeVisible: rawSettings.badgeVisible ?? DEFAULT_SETTINGS.badgeVisible,
+      debugMode: rawSettings.debugMode ?? DEFAULT_SETTINGS.debugMode,
+      hoverDelay: sanitizeNumericSetting('hoverDelay', rawSettings.hoverDelay ?? DEFAULT_SETTINGS.hoverDelay),
+      removeQuery: rawSettings.removeQuery ?? DEFAULT_SETTINGS.removeQuery,
+      removeHash: rawSettings.removeHash ?? DEFAULT_SETTINGS.removeHash,
+      cleanSearchUrls: rawSettings.cleanSearchUrls ?? DEFAULT_SETTINGS.cleanSearchUrls,
+      skipUtilityPages: rawSettings.skipUtilityPages ?? DEFAULT_SETTINGS.skipUtilityPages,
+      debounceEnabled: rawSettings.debounceEnabled ?? DEFAULT_SETTINGS.debounceEnabled,
+      debounceDelay: sanitizeNumericSetting('debounceDelay', rawSettings.debounceDelay ?? DEFAULT_SETTINGS.debounceDelay),
+      webWorkerEnabled: rawSettings.webWorkerEnabled ?? DEFAULT_SETTINGS.webWorkerEnabled,
+      pauseWhenHidden: rawSettings.pauseWhenHidden ?? DEFAULT_SETTINGS.pauseWhenHidden,
+      adaptivePolling: rawSettings.adaptivePolling ?? DEFAULT_SETTINGS.adaptivePolling,
+      pollInterval: sanitizeNumericSetting('pollInterval', rawSettings.pollInterval ?? DEFAULT_SETTINGS.pollInterval),
+      maxUrlsStored: sanitizeNumericSetting('maxUrlsStored', rawSettings.maxUrlsStored ?? DEFAULT_SETTINGS.maxUrlsStored),
+      maxVisitsStored: sanitizeNumericSetting('maxVisitsStored', rawSettings.maxVisitsStored ?? DEFAULT_SETTINGS.maxVisitsStored)
+    };
+  }
+
+  function applySettings(settings) {
+    badgeVisible = Boolean(settings.badgeVisible);
+    CONFIG.DEBUG = Boolean(settings.debugMode);
+    CONFIG.HOVER_DELAY = settings.hoverDelay;
+    CONFIG.NORMALIZE_URL.REMOVE_QUERY = Boolean(settings.removeQuery);
+    CONFIG.NORMALIZE_URL.REMOVE_HASH = Boolean(settings.removeHash);
+    CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = Boolean(settings.cleanSearchUrls);
+    CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = Boolean(settings.skipUtilityPages);
+    CONFIG.DEBOUNCE.ENABLED = Boolean(settings.debounceEnabled);
+    CONFIG.DEBOUNCE.DELAY = settings.debounceDelay;
+    CONFIG.WEB_WORKER.ENABLED = Boolean(settings.webWorkerEnabled);
+    CONFIG.POLLING.PAUSE_WHEN_HIDDEN = Boolean(settings.pauseWhenHidden);
+    CONFIG.POLLING.ADAPTIVE = Boolean(settings.adaptivePolling);
+    CONFIG.POLL_INTERVAL = settings.pollInterval;
+    CONFIG.MAX_URLS_STORED = settings.maxUrlsStored;
+    CONFIG.MAX_VISITS_STORED = settings.maxVisitsStored;
+  }
+
+  function getCurrentSettings() {
+    return {
+      badgeVisible,
+      debugMode: CONFIG.DEBUG,
+      hoverDelay: CONFIG.HOVER_DELAY,
+      removeQuery: CONFIG.NORMALIZE_URL.REMOVE_QUERY,
+      removeHash: CONFIG.NORMALIZE_URL.REMOVE_HASH,
+      cleanSearchUrls: CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS,
+      skipUtilityPages: CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES,
+      debounceEnabled: CONFIG.DEBOUNCE.ENABLED,
+      debounceDelay: CONFIG.DEBOUNCE.DELAY,
+      webWorkerEnabled: CONFIG.WEB_WORKER.ENABLED,
+      pauseWhenHidden: CONFIG.POLLING.PAUSE_WHEN_HIDDEN,
+      adaptivePolling: CONFIG.POLLING.ADAPTIVE,
+      pollInterval: CONFIG.POLL_INTERVAL,
+      maxUrlsStored: CONFIG.MAX_URLS_STORED,
+      maxVisitsStored: CONFIG.MAX_VISITS_STORED
+    };
+  }
+
+  function persistSettings(settings = getCurrentSettings()) {
+    GM_setValue('badgeVisible', settings.badgeVisible);
+    GM_setValue('debugMode', settings.debugMode);
+    GM_setValue('hoverDelay', settings.hoverDelay);
+    GM_setValue('removeQuery', settings.removeQuery);
+    GM_setValue('removeHash', settings.removeHash);
+    GM_setValue('searchCleaning', settings.cleanSearchUrls);
+    GM_setValue('urlFiltering', settings.skipUtilityPages);
+    GM_setValue('debounceEnabled', settings.debounceEnabled);
+    GM_setValue('debounceDelay', settings.debounceDelay);
+    GM_setValue('webWorkerEnabled', settings.webWorkerEnabled);
+    GM_setValue('pauseWhenHidden', settings.pauseWhenHidden);
+    GM_setValue('adaptivePolling', settings.adaptivePolling);
+    GM_setValue('pollInterval', settings.pollInterval);
+    GM_setValue('maxUrlsStored', settings.maxUrlsStored);
+    GM_setValue('maxVisitsStored', settings.maxVisitsStored);
+  }
 
   function normalizeUrl(url) {
     // Validate input URL first
@@ -267,6 +377,34 @@
     return target.closest(selector);
   }
 
+  function getPollingInterval() {
+    let interval = CONFIG.POLL_INTERVAL;
+
+    if (CONFIG.POLLING.ADAPTIVE) {
+      interval = activityCount > 0
+        ? Math.max(2000, Math.floor(CONFIG.POLL_INTERVAL / 2))
+        : CONFIG.POLL_INTERVAL * 2;
+      activityCount = Math.max(0, activityCount - 1);
+    }
+
+    return interval;
+  }
+
+  function scheduleNextPoll() {
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
+    }
+
+    pollTimer = window.setTimeout(() => {
+      pollTimer = null;
+      directPoll();
+
+      if (!CONFIG.POLLING.PAUSE_WHEN_HIDDEN || !document.hidden) {
+        scheduleNextPoll();
+      }
+    }, getPollingInterval());
+  }
+
   // Polling control functions
   function directPoll() {
     // Skip polling when tab is hidden for performance
@@ -282,17 +420,7 @@
 
     // Check if we should process pending URL change
     if (pendingUrlChange && !pendingTimeout && (now - lastUrlChangeTime) >= URL_CHANGE_MIN_INTERVAL) {
-      if (CONFIG.DEBUG) {
-        console.log(`🔄 Polling processing pending URL change: ${currentUrl} → ${pendingUrlChange}`);
-      }
-      const savedPendingUrl = pendingUrlChange;
-      pendingUrlChange = null;
-      // Validate URL before processing
-      if (savedPendingUrl && savedPendingUrl !== currentUrl) {
-        currentUrl = savedPendingUrl;
-        lastUrlChangeTime = now;
-        updateVisit();
-      }
+      onUrlChange(pendingUrlChange);
     }
 
     // Only process if URL actually changed and enough time has passed
@@ -300,33 +428,21 @@
       if (CONFIG.DEBUG) {
         console.log(`🔄 Polling detected URL change: ${lastHref} → ${currentHref}`);
       }
-      lastHref = currentHref;
-      lastCheck = now;
-      onUrlChange();
-    } else if (currentHref !== lastHref) {
-      // URL changed but too soon - just update lastHref to prevent spam
-      lastHref = currentHref;
+      onUrlChange(currentHref);
     }
   }
 
   function startPolling() {
-    if (pollTimer) clearInterval(pollTimer);
-
-    // Adaptive polling interval based on activity
-    let interval = CONFIG.POLL_INTERVAL;
-    if (CONFIG.POLLING.ADAPTIVE) {
-      // More frequent polling if recent activity, less if idle
-      interval = activityCount > 0 ? Math.max(2000, CONFIG.POLL_INTERVAL / 2) : CONFIG.POLL_INTERVAL * 2;
-      // Decay activity count over time
-      activityCount = Math.max(0, activityCount - 1);
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
     }
 
-    pollTimer = setInterval(directPoll, interval);
+    scheduleNextPoll();
   }
 
   function stopPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer);
+    if (pollTimer !== null) {
+      clearTimeout(pollTimer);
       pollTimer = null;
     }
   }
@@ -356,6 +472,37 @@
     }
   }
 
+  function getCleanupThreshold() {
+    return Math.max(CONFIG.MAX_URLS_STORED + 1, Math.ceil(CONFIG.MAX_URLS_STORED * 1.2));
+  }
+
+  function trimDbToMaxUrls(dbData, maxUrls) {
+    const urlKeys = Object.keys(dbData);
+    if (urlKeys.length <= maxUrls) {
+      return dbData;
+    }
+
+    // Calculate score for each URL (visits * recency)
+    const scored = urlKeys.map(url => {
+      const data = dbData[url];
+      const recentVisit = data.visits?.[0] ?? 0;
+      const daysSinceVisit = (Date.now() - recentVisit) / (1000 * 60 * 60 * 24);
+      const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30;
+      const score = data.count * (1 + recencyScore);
+      return { url, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    const keepUrls = scored.slice(0, maxUrls);
+
+    const cleanDb = {};
+    for (const { url } of keepUrls) {
+      cleanDb[url] = dbData[url];
+    }
+
+    return cleanDb;
+  }
+
   // Smart cleanup to maintain database size with performance optimization
   // Uses Web Worker for heavy computation to avoid blocking UI
   async function cleanupOldUrls(db) {
@@ -365,31 +512,6 @@
     if (CONFIG.DEBUG) {
       console.log(`🧹 Large database cleanup: ${urls.length} → ${CONFIG.MAX_URLS_STORED} URLs`);
     }
-
-    // Cleanup logic - can run in main thread or Web Worker
-    const performCleanup = (dbData, maxUrls) => {
-      const urlKeys = Object.keys(dbData);
-      // Calculate score for each URL (visits * recency)
-      const scored = urlKeys.map(url => {
-        const data = dbData[url];
-        const recentVisit = data.visits?.[0] ?? 0;
-        const daysSinceVisit = (Date.now() - recentVisit) / (1000 * 60 * 60 * 24);
-        const recencyScore = Math.max(0, 30 - daysSinceVisit) / 30;
-        const score = data.count * (1 + recencyScore);
-        return { url, score };
-      });
-
-      // Keep top URLs by score
-      scored.sort((a, b) => b.score - a.score);
-      const keepUrls = scored.slice(0, maxUrls);
-
-      // Build clean database
-      const cleanDb = {};
-      for (const { url } of keepUrls) {
-        cleanDb[url] = dbData[url];
-      }
-      return cleanDb;
-    };
 
     // Try Web Worker for large databases
     if (CONFIG.WEB_WORKER.ENABLED && urls.length > 5000 && typeof Worker !== 'undefined') {
@@ -407,12 +529,12 @@
     if (window.requestIdleCallback && urls.length > 3000) {
       return new Promise(resolve => {
         requestIdleCallback(() => {
-          resolve(performCleanup(db, CONFIG.MAX_URLS_STORED));
+          resolve(trimDbToMaxUrls(db, CONFIG.MAX_URLS_STORED));
         }, { timeout: 10000 });
       });
     }
 
-    return performCleanup(db, CONFIG.MAX_URLS_STORED);
+    return trimDbToMaxUrls(db, CONFIG.MAX_URLS_STORED);
   }
 
   // Web Worker implementation for cleanup (runs in separate thread)
@@ -535,15 +657,34 @@
   let pendingDbWrite = null;
   let debounceTimer = null;
 
+  async function prepareDbForPersistence(db) {
+    let nextDb = db;
+
+    if (Object.keys(nextDb).length > getCleanupThreshold()) {
+      nextDb = await cleanupOldUrls(nextDb);
+    }
+
+    dbCache = nextDb;
+    cacheValid = true;
+    return nextDb;
+  }
+
+  function prepareDbForPersistenceSync(db) {
+    let nextDb = db;
+
+    if (Object.keys(nextDb).length > getCleanupThreshold()) {
+      nextDb = trimDbToMaxUrls(nextDb, CONFIG.MAX_URLS_STORED);
+    }
+
+    dbCache = nextDb;
+    cacheValid = true;
+    return nextDb;
+  }
+
   // Internal function to actually write to storage
   async function _persistDB(db) {
     try {
-      // Auto cleanup if database is getting too large
-      if (Object.keys(db).length > CONFIG.CLEANUP_THRESHOLD) {
-        db = await cleanupOldUrls(db);
-        // Update cache with cleaned data
-        dbCache = db;
-      }
+      db = await prepareDbForPersistence(db);
 
       // Persist to storage
       GM_setValue('visitDB', db);
@@ -600,7 +741,8 @@
         debounceTimer = null;
       }
       try {
-        GM_setValue('visitDB', pendingDbWrite);
+        const dataToWrite = prepareDbForPersistenceSync(pendingDbWrite);
+        GM_setValue('visitDB', dataToWrite);
       } catch (error) {
         console.warn('Failed to flush pending writes:', error);
       }
@@ -608,36 +750,66 @@
     }
   }
 
-  // Invalidate cache when external changes might occur (multi-tab coordination)
-  // This function is used when CONFIG.MULTI_TAB.ENABLED is true to ensure
-  // cache consistency across multiple tabs
-  function invalidateCache() {
-    cacheValid = false;
-    // Use setTimeout to prevent race conditions
-    setTimeout(() => {
-      dbCache = null;
-    }, 0);
-  }
-
   let currentUrl = normalizeUrl(location.href);
 
-  function updateVisit() {
-    // Skip tracking if current URL matches filter patterns
-    if (shouldSkipUrl(location.href)) {
-      if (CONFIG.DEBUG) {
-        console.log(`🚫 Skipping visit tracking: ${location.href}`);
-      }
-      return;
+  function getLocationState(href = location.href) {
+    return {
+      href,
+      normalizedUrl: normalizeUrl(href),
+      shouldTrack: !shouldSkipUrl(href)
+    };
+  }
+
+  function clearPendingUrlChange() {
+    if (pendingTimeout) {
+      clearTimeout(pendingTimeout);
+      pendingTimeout = null;
+    }
+    pendingUrlChange = null;
+  }
+
+  function commitLocationChange(locationState, { forceTrack = false, timestamp = Date.now() } = {}) {
+    const previousUrl = currentUrl;
+    const nextUrl = locationState.normalizedUrl;
+    const hasUrlChanged = forceTrack || nextUrl !== previousUrl;
+
+    currentUrl = nextUrl;
+    lastHref = locationState.href;
+    lastCheck = timestamp;
+
+    if (!hasUrlChanged) {
+      return false;
     }
 
+    if (!locationState.shouldTrack) {
+      if (CONFIG.DEBUG) {
+        console.log(`🚫 Skipping URL tracking: ${locationState.href}`);
+      }
+      return false;
+    }
+
+    if (CONFIG.POLLING.ADAPTIVE) {
+      activityCount = Math.min(10, activityCount + 2);
+    }
+
+    if (CONFIG.DEBUG) {
+      console.log(`🌐 URL changed: ${previousUrl} → ${nextUrl}`);
+    }
+
+    lastUrlChangeTime = timestamp;
+    updateVisit(nextUrl);
+    return true;
+  }
+
+  function updateVisit(urlKey = currentUrl) {
     const db = getDB();
     const now = new Date();
     const timestamp = createTimestamp(now);
 
     // Use logical assignment and modern destructuring
-    db[currentUrl] ??= { count: 0, visits: [] };
+    db[urlKey] ??= { count: 0, visits: [] };
 
-    const urlData = db[currentUrl];
+    const urlData = db[urlKey];
     urlData.count += 1;
     urlData.visits.unshift(timestamp);
 
@@ -649,8 +821,8 @@
     if (CONFIG.DEBUG) {
       const isNew = urlData.count === 1;
       console.log(isNew
-        ? `🆕 New URL tracked: ${currentUrl}`
-        : `🔄 URL revisited: ${currentUrl} (${urlData.count} times)`
+        ? `🆕 New URL tracked: ${urlKey}`
+        : `🔄 URL revisited: ${urlKey} (${urlData.count} times)`
       );
     }
 
@@ -750,12 +922,19 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   }
 
   function clearCurrentPage() {
-    if (confirm(`Clear visit data for current page?\n\nURL: ${currentUrl}\nThis will only affect this page.`)) {
+    const locationState = getLocationState(location.href);
+    if (!locationState.shouldTrack) {
+      alert('Current page is excluded from tracking, so there is no visit data to clear.');
+      return;
+    }
+
+    if (confirm(`Clear visit data for current page?\n\nURL: ${locationState.normalizedUrl}\nThis will only affect this page.`)) {
       const db = getDB();
 
       // Clear old data and immediately set new entry in single operation
       const now = new Date();
       const timestamp = createTimestamp(now);
+      currentUrl = locationState.normalizedUrl;
       db[currentUrl] = { count: 1, visits: [timestamp] };
       setDB(db);
 
@@ -768,17 +947,27 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
   function clearAllData() {
     if (confirm('⚠️ WARNING: This will clear ALL visit data from ALL websites!\n\nAre you absolutely sure?')) {
-      // Clear all data and immediately create new entry for current page in single operation
-      const now = new Date();
-      const timestamp = createTimestamp(now);
+      const locationState = getLocationState(location.href);
       const newDb = {};
-      newDb[currentUrl] = { count: 1, visits: [timestamp] };
+
+      if (locationState.shouldTrack) {
+        const now = new Date();
+        const timestamp = createTimestamp(now);
+        currentUrl = locationState.normalizedUrl;
+        newDb[currentUrl] = { count: 1, visits: [timestamp] };
+        setDB(newDb);
+        renderBadge(newDb[currentUrl]);
+        alert('All visit data cleared! Current page counter reset to 1.');
+        return;
+      }
+
       setDB(newDb);
+      const badge = document.getElementById('vt-hover-badge');
+      if (badge) {
+        badge.remove();
+      }
 
-      // Update UI immediately with new data
-      renderBadge(newDb[currentUrl]);
-
-      alert('All visit data cleared! Current page counter reset to 1.');
+      alert('All visit data cleared. The current page is excluded from tracking, so no new entry was created.');
     }
   }
 
@@ -898,7 +1087,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     // Save state to GM storage
     try {
-      GM_setValue('badgeVisible', badgeVisible);
+      persistSettings();
     } catch (error) {
       console.warn('Failed to save badge visibility state:', error);
     }
@@ -909,7 +1098,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     // Save state to GM storage
     try {
-      GM_setValue('urlFiltering', CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES);
+      persistSettings();
     } catch (error) {
       console.warn('Failed to save URL filtering state:', error);
     }
@@ -923,7 +1112,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     // Save state to GM storage
     try {
-      GM_setValue('searchCleaning', CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS);
+      persistSettings();
     } catch (error) {
       console.warn('Failed to save search cleaning state:', error);
     }
@@ -937,7 +1126,7 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
 
     // Save state to GM storage
     try {
-      GM_setValue('debugMode', CONFIG.DEBUG);
+      persistSettings();
     } catch (error) {
       console.warn('Failed to save debug mode state:', error);
     }
@@ -1331,13 +1520,6 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
               </div>
               <input type="number" class="vt-input-number" value="${CONFIG.MAX_VISITS_STORED}" data-setting="maxVisitsStored" min="5" max="100" step="5">
             </div>
-            <div class="vt-setting-row">
-              <div class="vt-setting-label">
-                <span class="vt-setting-name">Multi-Tab Sync</span>
-                <span class="vt-setting-desc">Sync data across browser tabs</span>
-              </div>
-              <div class="vt-toggle ${CONFIG.MULTI_TAB.ENABLED ? 'active' : ''}" data-setting="multiTabEnabled"></div>
-            </div>
           </div>
         </div>
         <div class="vt-settings-footer">
@@ -1435,43 +1617,30 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     try {
       // Read all settings from UI
       const getToggle = (name) => settingsPanel.querySelector(`[data-setting="${name}"]`).classList.contains('active');
-      const getNumber = (name) => parseInt(settingsPanel.querySelector(`[data-setting="${name}"]`).value, 10);
+      const getNumber = (name) => settingsPanel.querySelector(`[data-setting="${name}"]`).value;
 
-      // Update CONFIG
-      badgeVisible = getToggle('badgeVisible');
-      CONFIG.DEBUG = getToggle('debug');
-      CONFIG.HOVER_DELAY = getNumber('hoverDelay');
-      CONFIG.NORMALIZE_URL.REMOVE_QUERY = getToggle('removeQuery');
-      CONFIG.NORMALIZE_URL.REMOVE_HASH = getToggle('removeHash');
-      CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = getToggle('cleanSearchUrls');
-      CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = getToggle('skipUtilityPages');
-      CONFIG.DEBOUNCE.ENABLED = getToggle('debounceEnabled');
-      CONFIG.DEBOUNCE.DELAY = getNumber('debounceDelay');
-      CONFIG.WEB_WORKER.ENABLED = getToggle('webWorkerEnabled');
-      CONFIG.POLLING.PAUSE_WHEN_HIDDEN = getToggle('pauseWhenHidden');
-      CONFIG.POLLING.ADAPTIVE = getToggle('adaptivePolling');
-      CONFIG.POLL_INTERVAL = getNumber('pollInterval');
-      CONFIG.MAX_URLS_STORED = getNumber('maxUrlsStored');
-      CONFIG.MAX_VISITS_STORED = getNumber('maxVisitsStored');
-      CONFIG.MULTI_TAB.ENABLED = getToggle('multiTabEnabled');
+      const settings = buildValidatedSettings({
+        badgeVisible: getToggle('badgeVisible'),
+        debugMode: getToggle('debug'),
+        hoverDelay: getNumber('hoverDelay'),
+        removeQuery: getToggle('removeQuery'),
+        removeHash: getToggle('removeHash'),
+        cleanSearchUrls: getToggle('cleanSearchUrls'),
+        skipUtilityPages: getToggle('skipUtilityPages'),
+        debounceEnabled: getToggle('debounceEnabled'),
+        debounceDelay: getNumber('debounceDelay'),
+        webWorkerEnabled: getToggle('webWorkerEnabled'),
+        pauseWhenHidden: getToggle('pauseWhenHidden'),
+        adaptivePolling: getToggle('adaptivePolling'),
+        pollInterval: getNumber('pollInterval'),
+        maxUrlsStored: getNumber('maxUrlsStored'),
+        maxVisitsStored: getNumber('maxVisitsStored')
+      });
 
-      // Persist to GM storage
-      GM_setValue('badgeVisible', badgeVisible);
-      GM_setValue('debugMode', CONFIG.DEBUG);
-      GM_setValue('hoverDelay', CONFIG.HOVER_DELAY);
-      GM_setValue('removeQuery', CONFIG.NORMALIZE_URL.REMOVE_QUERY);
-      GM_setValue('removeHash', CONFIG.NORMALIZE_URL.REMOVE_HASH);
-      GM_setValue('searchCleaning', CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS);
-      GM_setValue('urlFiltering', CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES);
-      GM_setValue('debounceEnabled', CONFIG.DEBOUNCE.ENABLED);
-      GM_setValue('debounceDelay', CONFIG.DEBOUNCE.DELAY);
-      GM_setValue('webWorkerEnabled', CONFIG.WEB_WORKER.ENABLED);
-      GM_setValue('pauseWhenHidden', CONFIG.POLLING.PAUSE_WHEN_HIDDEN);
-      GM_setValue('adaptivePolling', CONFIG.POLLING.ADAPTIVE);
-      GM_setValue('pollInterval', CONFIG.POLL_INTERVAL);
-      GM_setValue('maxUrlsStored', CONFIG.MAX_URLS_STORED);
-      GM_setValue('maxVisitsStored', CONFIG.MAX_VISITS_STORED);
-      GM_setValue('multiTabEnabled', CONFIG.MULTI_TAB.ENABLED);
+      applySettings(settings);
+      currentUrl = normalizeUrl(location.href);
+      lastHref = location.href;
+      persistSettings(settings);
 
       // Update badge visibility
       const badge = document.getElementById('vt-hover-badge');
@@ -1498,24 +1667,22 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   function resetSettings() {
     if (!confirm('Reset all settings to default values?')) return;
 
-    // Default values
     const defaults = {
-      badgeVisible: true,
-      debug: false,
-      hoverDelay: 1000,
-      removeQuery: false,
-      removeHash: true,
-      cleanSearchUrls: true,
-      skipUtilityPages: true,
-      debounceEnabled: true,
-      debounceDelay: 1000,
-      webWorkerEnabled: true,
-      pauseWhenHidden: true,
-      adaptivePolling: true,
-      pollInterval: 5000,
-      maxUrlsStored: 10000,
-      maxVisitsStored: 20,
-      multiTabEnabled: false
+      badgeVisible: DEFAULT_SETTINGS.badgeVisible,
+      debug: DEFAULT_SETTINGS.debugMode,
+      hoverDelay: DEFAULT_SETTINGS.hoverDelay,
+      removeQuery: DEFAULT_SETTINGS.removeQuery,
+      removeHash: DEFAULT_SETTINGS.removeHash,
+      cleanSearchUrls: DEFAULT_SETTINGS.cleanSearchUrls,
+      skipUtilityPages: DEFAULT_SETTINGS.skipUtilityPages,
+      debounceEnabled: DEFAULT_SETTINGS.debounceEnabled,
+      debounceDelay: DEFAULT_SETTINGS.debounceDelay,
+      webWorkerEnabled: DEFAULT_SETTINGS.webWorkerEnabled,
+      pauseWhenHidden: DEFAULT_SETTINGS.pauseWhenHidden,
+      adaptivePolling: DEFAULT_SETTINGS.adaptivePolling,
+      pollInterval: DEFAULT_SETTINGS.pollInterval,
+      maxUrlsStored: DEFAULT_SETTINGS.maxUrlsStored,
+      maxVisitsStored: DEFAULT_SETTINGS.maxVisitsStored
     };
 
     // Update UI
@@ -1558,22 +1725,27 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   // Load all saved settings on initialization
   function loadSavedSettings() {
     try {
-      badgeVisible = GM_getValue('badgeVisible', CONFIG.BADGE_VISIBLE);
-      CONFIG.DEBUG = GM_getValue('debugMode', CONFIG.DEBUG);
-      CONFIG.HOVER_DELAY = GM_getValue('hoverDelay', CONFIG.HOVER_DELAY);
-      CONFIG.NORMALIZE_URL.REMOVE_QUERY = GM_getValue('removeQuery', CONFIG.NORMALIZE_URL.REMOVE_QUERY);
-      CONFIG.NORMALIZE_URL.REMOVE_HASH = GM_getValue('removeHash', CONFIG.NORMALIZE_URL.REMOVE_HASH);
-      CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS = GM_getValue('searchCleaning', CONFIG.NORMALIZE_URL.CLEAN_SEARCH_URLS);
-      CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES = GM_getValue('urlFiltering', CONFIG.URL_FILTERS.SKIP_UTILITY_PAGES);
-      CONFIG.DEBOUNCE.ENABLED = GM_getValue('debounceEnabled', CONFIG.DEBOUNCE.ENABLED);
-      CONFIG.DEBOUNCE.DELAY = GM_getValue('debounceDelay', CONFIG.DEBOUNCE.DELAY);
-      CONFIG.WEB_WORKER.ENABLED = GM_getValue('webWorkerEnabled', CONFIG.WEB_WORKER.ENABLED);
-      CONFIG.POLLING.PAUSE_WHEN_HIDDEN = GM_getValue('pauseWhenHidden', CONFIG.POLLING.PAUSE_WHEN_HIDDEN);
-      CONFIG.POLLING.ADAPTIVE = GM_getValue('adaptivePolling', CONFIG.POLLING.ADAPTIVE);
-      CONFIG.POLL_INTERVAL = GM_getValue('pollInterval', CONFIG.POLL_INTERVAL);
-      CONFIG.MAX_URLS_STORED = GM_getValue('maxUrlsStored', CONFIG.MAX_URLS_STORED);
-      CONFIG.MAX_VISITS_STORED = GM_getValue('maxVisitsStored', CONFIG.MAX_VISITS_STORED);
-      CONFIG.MULTI_TAB.ENABLED = GM_getValue('multiTabEnabled', CONFIG.MULTI_TAB.ENABLED);
+      const settings = buildValidatedSettings({
+        badgeVisible: GM_getValue('badgeVisible', DEFAULT_SETTINGS.badgeVisible),
+        debugMode: GM_getValue('debugMode', DEFAULT_SETTINGS.debugMode),
+        hoverDelay: GM_getValue('hoverDelay', DEFAULT_SETTINGS.hoverDelay),
+        removeQuery: GM_getValue('removeQuery', DEFAULT_SETTINGS.removeQuery),
+        removeHash: GM_getValue('removeHash', DEFAULT_SETTINGS.removeHash),
+        cleanSearchUrls: GM_getValue('searchCleaning', DEFAULT_SETTINGS.cleanSearchUrls),
+        skipUtilityPages: GM_getValue('urlFiltering', DEFAULT_SETTINGS.skipUtilityPages),
+        debounceEnabled: GM_getValue('debounceEnabled', DEFAULT_SETTINGS.debounceEnabled),
+        debounceDelay: GM_getValue('debounceDelay', DEFAULT_SETTINGS.debounceDelay),
+        webWorkerEnabled: GM_getValue('webWorkerEnabled', DEFAULT_SETTINGS.webWorkerEnabled),
+        pauseWhenHidden: GM_getValue('pauseWhenHidden', DEFAULT_SETTINGS.pauseWhenHidden),
+        adaptivePolling: GM_getValue('adaptivePolling', DEFAULT_SETTINGS.adaptivePolling),
+        pollInterval: GM_getValue('pollInterval', DEFAULT_SETTINGS.pollInterval),
+        maxUrlsStored: GM_getValue('maxUrlsStored', DEFAULT_SETTINGS.maxUrlsStored),
+        maxVisitsStored: GM_getValue('maxVisitsStored', DEFAULT_SETTINGS.maxVisitsStored)
+      });
+
+      applySettings(settings);
+      currentUrl = normalizeUrl(location.href);
+      lastHref = location.href;
     } catch (error) {
       console.warn('Failed to load saved settings:', error);
     }
@@ -1585,74 +1757,50 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
   let pendingTimeout = null;
   const URL_CHANGE_MIN_INTERVAL = 500; // Minimum 500ms between URL changes
 
-  function onUrlChange() {
-    const newUrl = normalizeUrl(location.href);
-    if (newUrl === currentUrl) return;
-
-    // Skip tracking if URL matches filter patterns
-    if (shouldSkipUrl(location.href)) {
-      if (CONFIG.DEBUG) {
-        console.log(`🚫 Skipping URL tracking: ${location.href}`);
-      }
-      return;
-    }
-
-    // Increment activity counter for adaptive polling
-    if (CONFIG.POLLING.ADAPTIVE) {
-      activityCount = Math.min(10, activityCount + 2); // Cap at 10, add 2 for URL change
-    }
-
+  function onUrlChange(href = location.href, options = {}) {
     const now = Date.now();
+    const locationState = getLocationState(href);
+
+    if (!options.forceTrack && locationState.normalizedUrl === currentUrl) {
+      lastHref = href;
+      lastCheck = now;
+      return false;
+    }
+
+    if (!locationState.shouldTrack) {
+      clearPendingUrlChange();
+      return commitLocationChange(locationState, { forceTrack: options.forceTrack, timestamp: now });
+    }
+
     const timeSinceLastChange = now - lastUrlChangeTime;
 
-    if (timeSinceLastChange < URL_CHANGE_MIN_INTERVAL) {
+    if (!options.forceTrack && timeSinceLastChange < URL_CHANGE_MIN_INTERVAL) {
       if (CONFIG.DEBUG) {
-        console.log(`⏰ URL change rate limited, scheduling: ${currentUrl} → ${newUrl}`);
+        console.log(`⏰ URL change rate limited, scheduling: ${currentUrl} → ${locationState.normalizedUrl}`);
       }
 
-      // Store the pending change without updating currentUrl yet
-      pendingUrlChange = newUrl;
-
-      // Clear any existing pending timeout
       if (pendingTimeout) {
         clearTimeout(pendingTimeout);
       }
-
-      // Schedule the change for when rate limit expires
+      pendingUrlChange = href;
       const remainingTime = URL_CHANGE_MIN_INTERVAL - timeSinceLastChange;
       pendingTimeout = setTimeout(() => {
-        if (pendingUrlChange && pendingUrlChange !== currentUrl) {
-          if (CONFIG.DEBUG) {
-            console.log(`⏰ Processing pending URL change: ${currentUrl} → ${pendingUrlChange}`);
-          }
-          const savedPendingUrl = pendingUrlChange;
-          pendingUrlChange = null;
-          pendingTimeout = null;
+        const pendingHref = pendingUrlChange;
+        clearPendingUrlChange();
 
-          // Process the pending change
-          currentUrl = savedPendingUrl;
-          lastUrlChangeTime = Date.now();
-          updateVisit();
+        if (pendingHref) {
+          if (CONFIG.DEBUG) {
+            console.log(`⏰ Processing pending URL change: ${currentUrl} → ${normalizeUrl(pendingHref)}`);
+          }
+          onUrlChange(pendingHref);
         }
       }, remainingTime + 10); // +10ms buffer
 
-      return;
+      return false;
     }
 
-    // Clear any pending changes since we're processing immediately
-    if (pendingTimeout) {
-      clearTimeout(pendingTimeout);
-      pendingTimeout = null;
-      pendingUrlChange = null;
-    }
-
-    if (CONFIG.DEBUG) {
-      console.log(`🌐 URL changed: ${currentUrl} → ${newUrl}`);
-    }
-
-    currentUrl = newUrl;
-    lastUrlChangeTime = now;
-    updateVisit();
+    clearPendingUrlChange();
+    return commitLocationChange(locationState, { forceTrack: options.forceTrack, timestamp: now });
   }
 
   function installUrlObservers() {
@@ -2091,10 +2239,10 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     }
 
     // Don't register menu for initial empty state - let updateVisit() handle it
-    updateVisit();
+    commitLocationChange(getLocationState(location.href), { forceTrack: true });
     installUrlObservers();
 
-    // Handle polling optimization and cache invalidation for multi-tab scenarios
+    // Handle polling optimization
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         // Tab became hidden - pause polling if configured
@@ -2115,21 +2263,8 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
           }
           startPolling();
         }
-        // Multi-tab cache coordination if enabled
-        if (CONFIG.MULTI_TAB.ENABLED) {
-          invalidateCache();
-        }
       }
     }, { passive: true });
-
-    // Multi-tab cache synchronization if enabled
-    if (CONFIG.MULTI_TAB.ENABLED) {
-      setInterval(() => {
-        if (!document.hidden) {
-          invalidateCache();
-        }
-      }, CONFIG.MULTI_TAB.SYNC_INTERVAL);
-    }
   }
 
   // Cleanup pending operations on page unload
@@ -2137,12 +2272,11 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
     // Flush any pending debounced database writes
     flushPendingWrites();
 
-    if (pendingTimeout) {
-      clearTimeout(pendingTimeout);
-      // Process any pending URL change immediately before unload
-      if (pendingUrlChange && pendingUrlChange !== currentUrl) {
-        currentUrl = pendingUrlChange;
-        updateVisit();
+    if (pendingTimeout || pendingUrlChange) {
+      const pendingHref = pendingUrlChange;
+      clearPendingUrlChange();
+      if (pendingHref) {
+        commitLocationChange(getLocationState(pendingHref), { timestamp: Date.now() });
         // Flush the new write as well
         flushPendingWrites();
       }
