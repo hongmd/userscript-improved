@@ -1,54 +1,99 @@
 # Userscript Improved
 
-Bộ sưu tập userscripts hiệu suất cao để cải thiện trải nghiệm duyệt web.
+A collection of browser userscripts for improving day-to-day browsing, media handling, and site-specific workflows. The repository focuses on lightweight scripts with practical UI controls, persistent settings, and compatibility with modern userscript managers.
 
-## 📚 Scripts
+## Scripts
 
-### 📊 URL Visit Tracker v1.9.9
-Theo dõi số lần truy cập trang web với badge floating và tooltip thông minh.
-- Toggle hiển thị badge (click hoặc menu)
-- Xuất dữ liệu JSON, xóa lịch sử
-- Tối ưu hiệu suất với requestAnimationFrame
+### [URL Visit Tracker (Improved)](./scripts/URL-Visit-Tracker-Improved.user.js)
 
-### 📁 Google Drive Direct Download
-Chuyển đổi link Google Drive thành link tải trực tiếp.
+Tracks URL visits with a floating badge, hover tooltip, configurable URL normalization, and large local history capacity.
 
-### 🔧 Handlers Helper
-Quản lý protocol handler với khả năng tương thích cải thiện.
+Key features:
+- Floating visit counter badge
+- Hover tooltip with visit history
+- Configurable query/hash normalization
+- Search URL cleanup and utility-page filtering
+- Debounced storage writes and optional Web Worker cleanup
 
-### ⏱️ Page Load Speed Monitor
-Theo dõi hiệu suất tải trang real-time.
+### [Visited Links Enhanced](./scripts/visited-improved.user.js)
 
-### 🚫 Service Worker Auto Reject
-Chặn service worker tự động để tăng hiệu suất.
+Applies a customizable color style to visited links and includes a simple color picker via the userscript manager menu.
 
-### 🔗 Visited Links Improved
-Theo dõi và hiển thị link đã truy cập với hiệu suất tối ưu.
+Also available as a minified build:
+- [visited-improved-min.user.js](./scripts-min/visited-improved-min.user.js)
 
-## 📥 Cài đặt
+### [Reject ServiceWorker Auto](./scripts/Reject-ServiceWorker-Auto.user.js)
 
-1. Cài userscript manager: [Tampermonkey](https://tampermonkey.net/) (khuyến nghị)
-2. Vào `scripts/URL-Visit-Tracker-Improved.user.js`
-3. Click **"Raw"** trên GitHub
-4. Click **"Install"** khi userscript manager hiện lên
+Blocks `ServiceWorker` registration by default, with whitelist management for sites where background features should remain enabled.
 
-## 🛠️ Development
+### [Handlers Helper (Improved)](./scripts/Handlers-Helper/Handlers-Helper-Improved.user.js)
+
+Adds drag-to-action behavior for media links with support for external handlers such as MPV, `yt-dlp`, and `streamlink`.
+
+### [Facebook Story Downloader](./scripts/FB-story-download.user.js)
+
+Adds a download button for Facebook stories when supported media is detected on story pages.
+
+### [VOZ: Add Ignore Button in Threads](./scripts/voz-user-ignore-button.user.js)
+
+Adds an `Ignore` action next to user posts in VOZ forum threads and links directly to the XenForo ignore flow.
+
+## Requirements
+
+- A userscript manager such as [Tampermonkey](https://tampermonkey.net/), Violentmonkey, or ScriptCat
+- A modern Chromium- or Firefox-based browser
+- Optional external tools for some scripts, such as MPV or `yt-dlp`
+
+## Installation
+
+1. Install a userscript manager extension.
+2. Open the script you want from the [`scripts`](./scripts) directory.
+3. Click the file and open the raw version on GitHub.
+4. Confirm installation in your userscript manager.
+
+For the minified visited-links build, install the file from [`scripts-min`](./scripts-min).
+
+## Development
+
+Install dependencies:
 
 ```bash
-# Kiểm tra syntax
-node -c "scripts/*.user.js"
-
-# Đếm số dòng
-wc -l scripts/*.user.js
+npm install
 ```
 
-## 📊 Thống kê
-- **6 scripts** cho trải nghiệm duyệt web cải thiện
-- **Script chính**: URL Visit Tracker v1.9.9
-- **Tương thích**: Trình duyệt hiện đại + userscript manager
+Available commands:
 
-## 📄 License
+```bash
+npm run build:min
+npm test
+```
 
-MIT License - Sử dụng tự do, sửa đổi và phân phối.
+Useful local checks:
 
----
+```bash
+node -c build-minify.js
+node -c scripts/URL-Visit-Tracker-Improved.user.js
+node -c scripts/visited-improved.user.js
+node -c scripts/Reject-ServiceWorker-Auto.user.js
+node -c scripts/FB-story-download.user.js
+node -c scripts/voz-user-ignore-button.user.js
+node -c scripts/Handlers-Helper/Handlers-Helper-Improved.user.js
+```
+
+## Repository Layout
+
+```text
+scripts/       Source userscripts
+scripts-min/   Built/minified distributables
+build-minify.js  Minifier for visited-improved.user.js
+```
+
+## Notes
+
+- The main actively featured script is `URL-Visit-Tracker-Improved.user.js`.
+- `build-minify.js` currently generates the minified build only for `visited-improved.user.js`.
+- Some scripts are generic and work on many sites, while others are site-specific.
+
+## License
+
+Repository metadata is currently distributed under the license declared in [package.json](./package.json). Individual scripts may also include their own header license metadata.

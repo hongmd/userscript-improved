@@ -1,7 +1,7 @@
 {
   "name": "userscript-improved",
   "version": "1.0.0",
-  "description": "Bộ sưu tập userscripts hiệu suất cao để cải thiện trải nghiệm duyệt web.",
+  "description": "A collection of high-performance userscripts for improving the browsing experience.",
   "main": "build-minify.js",
   "scripts": {
     "build:min": "node build-minify.js",
