@@ -1,5 +1,9 @@
 # Userscript Improved
 
+[![CI](https://github.com/hongmd/userscript-improved/actions/workflows/ci.yml/badge.svg)](https://github.com/hongmd/userscript-improved/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/hongmd/userscript-improved)](https://github.com/hongmd/userscript-improved/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 A collection of browser userscripts for improving day-to-day browsing, media handling, and site-specific workflows. The repository focuses on lightweight scripts with practical UI controls, persistent settings, and compatibility with modern userscript managers.
 
 ## Scripts
@@ -64,21 +68,18 @@ npm install
 Available commands:
 
 ```bash
-npm run build:min
-npm test
+npm run build:min   # rebuild scripts-min/visited-improved-min.user.js
+npm run check       # syntax-check every userscript
 ```
 
 Useful local checks:
 
 ```bash
-node -c build-minify.js
-node -c scripts/URL-Visit-Tracker-Improved.user.js
-node -c scripts/visited-improved.user.js
-node -c scripts/Reject-ServiceWorker-Auto.user.js
-node -c scripts/FB-story-download.user.js
-node -c scripts/voz-user-ignore-button.user.js
-node -c scripts/Handlers-Helper/Handlers-Helper-Improved.user.js
+node --check build-minify.js
+find scripts -name '*.user.js' -print0 | xargs -0 -n1 node --check
 ```
+
+CI runs both on every push and PR. Pushing a `v*` tag publishes a GitHub Release with all userscripts attached.
 
 ## Repository Layout
 

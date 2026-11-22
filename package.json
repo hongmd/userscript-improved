@@ -5,7 +5,8 @@
   "main": "build-minify.js",
   "scripts": {
     "build:min": "node build-minify.js",
-    "test": "echo \"No tests\""
+    "check": "node --check build-minify.js && find scripts -name '*.user.js' -print0 | xargs -0 -n1 node --check",
+    "test": "npm run check"
   },
   "repository": {
     "type": "git",

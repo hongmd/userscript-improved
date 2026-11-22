@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check userscripts
+        run: find scripts -name '*.user.js' -print0 | xargs -0 -n1 node --check
+      - name: Verify minified build is up to date
+        run: |
+          npm ci
+          npm run build:min
+          git diff --exit-code scripts-min/

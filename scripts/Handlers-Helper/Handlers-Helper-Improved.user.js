@@ -13,8 +13,8 @@
 // @grant       GM_deleteValue
 // @grant       GM_addStyle
 // @grant       GM_registerMenuCommand
-// @downloadURL https://raw.githubusercontent.com/hongmd/userscript-improved/main/scripts/Handlers-Helper/Handlers-Helper-Improved.user.js
-// @updateURL   https://raw.githubusercontent.com/hongmd/userscript-improved/main/scripts/Handlers-Helper/Handlers-Helper-Improved.user.js
+// @downloadURL https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/Handlers-Helper/Handlers-Helper-Improved.user.js
+// @updateURL   https://raw.githubusercontent.com/hongmd/userscript-improved/master/scripts/Handlers-Helper/Handlers-Helper-Improved.user.js
 // @run-at      document-start
 // @noframes
 // ==/UserScript==
