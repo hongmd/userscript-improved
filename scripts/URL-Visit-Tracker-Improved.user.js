@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         URL Visit Tracker (Improved)
 // @namespace    https://github.com/hongmd/userscript-improved
-// @version      2.8.0
+// @version      2.8.1
 // @description  Track visits per URL, show corner badge history & link hover info - Massive Capacity (10K URLs) - ES2020+ & Smooth Tooltips. Advanced URL normalization and performance optimizations.
 // @author       hongmd
 // @contributor  Original idea by Chewy
@@ -1821,9 +1821,9 @@ Database size: ${Math.round(getActualDataSize(db) / 1024)} KB (UTF-8)
       return result;
     };
 
-    // Standard event listeners
-    window.addEventListener('popstate', onUrlChange);
-    window.addEventListener('hashchange', onUrlChange);
+    // Standard event listeners. Wrap so the Event object isn't passed as `href`.
+    window.addEventListener('popstate', () => onUrlChange());
+    window.addEventListener('hashchange', () => onUrlChange());
 
     // Optimized MutationObserver with focused title tracking
     let mutationTimeout = null;
